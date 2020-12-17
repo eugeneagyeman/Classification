@@ -1,3 +1,4 @@
+import net.didion.jwnl.data.Exc;
 import org.openimaj.data.dataset.GroupedDataset;
 import org.openimaj.data.dataset.ListDataset;
 import org.openimaj.data.dataset.VFSGroupDataset;
@@ -21,29 +22,6 @@ import java.util.*;
  * Work out the ouput - NOT ACCURATE (maybe use another classifier to work it out?)
  */
 public class SmallImageClassifier {
-
-
-    public static class NNDataPoint {
-        String classifier;
-        DoubleFV fv;
-
-        public NNDataPoint(String classifier, DoubleFV featureVector) {
-            this.classifier = classifier;
-            this.fv = featureVector;
-        }
-
-        public double compareTo(DoubleFV featureVector) {
-            return this.fv.compare(featureVector, DoubleFVComparison.EUCLIDEAN);
-        }
-
-        public String getClassifier() {
-            return classifier;
-        }
-
-        public String toString() {
-            return classifier+":"+fv.length();
-        }
-    }
 
     public static DoubleFV getSmallImageFV(FImage img) {
         FImage croppedImage;
@@ -74,201 +52,80 @@ public class SmallImageClassifier {
     }
 
     public static void main(String[] args) throws IOException {
-//        FImage img = ImageUtilities.readF(new URL("http://static.openimaj.org/media/tutorial/sinaface.jpg"));
-//        FImage croppedImage;
-//
-//        final int cropW = img.width/4;
-//        final int cropH = img.height/4;
-//        final int centreX=img.width/2;
-//        final int centreY=img.height/2;
-//
-//        final int boxSiz = (cropW < cropH)  ? cropW : cropH;
-//
-//        croppedImage=img.extractROI(centreX-(cropW/2), centreY-(cropH/2), boxSiz, boxSiz);
-//        DisplayUtilities.display(img);
-//        DisplayUtilities.display(croppedImage);
+
         File workingDir = new File("../classification");
         VFSGroupDataset<FImage> groups = new VFSGroupDataset<>("zip:"+workingDir.getAbsolutePath()+"/training.zip", ImageUtilities.FIMAGE_READER);
-        GroupedRandomSplitter<String, FImage> splitter = new GroupedRandomSplitter<>(groups, groups.size()/2, 0, groups.size()/2);
+        int splitSize = 50; // ideal as each group has 100 images --> 50 each
+        System.out.println("splitSize = " + splitSize);
+
+        GroupedRandomSplitter<String, FImage> splitter = new GroupedRandomSplitter<>(groups, splitSize, 0, splitSize);
         GroupedDataset<String, ListDataset<FImage>, FImage> train = splitter.getTrainingDataset();
         GroupedDataset<String, ListDataset<FImage>, FImage> test = splitter.getTestDataset();
 
-        Map<FImage, double[]> featureSpace = new HashMap<>();
-        Map<String, Integer> classIntPairs = new HashMap<>();
+        List<String> classes = new ArrayList<>();
 
-        double[][] ds = new double[train.size()][256];
-        final int[] i = {0};
-        final int K = 16;
+//        int maxSiz = getMaxSize(train);
+
+        List<double[]> featureSpace = new ArrayList<>();
+//        final int K = 5;
 
         train.forEach( (s, fs) -> {
             FImage image = fs.getRandomInstance();
-            featureSpace.put(image, getSmallImageFVArr(image));
-            ds[i[0]++] = getSmallImageFVArr(image);
+            fs.forEach( f -> {
+                double[] fv = getSmallImageFVArr(image);
+                featureSpace.add(fv);
+                classes.add(s);
+            });
         });
 
+        System.out.println("featureSpace.size() = " + featureSpace.size());
+        final int K = (int) Math.sqrt(featureSpace.size());
+        double[][] ds = featureSpace.toArray(new double[featureSpace.size()][256]);
 
         DoubleKNNAssigner nn = new DoubleKNNAssigner(ds, DoubleFVComparison.EUCLIDEAN, K);
-        GroupedDataset<String, ListDataset<FImage>, FImage> testing = splitter.getTestDataset();
 
-        DoubleNearestNeighboursExact dnn = new DoubleNearestNeighboursExact(ds);
+        final double[] correct = {0};
+        final double[] incorrect = {0};
 
+        System.out.println(classes);
         test.forEach( (s, fs) -> {
             System.out.println("---"+s+"---");
-            FImage f = fs.get(0);
-            int[] r = nn.assign(getSmallImageFVArr(f));
-            printListWithIndexes(r);
-
-        });
-
-//        train.forEach( (s, fs) -> {
-//            System.out.println("-------"+s+"-------");
-//            fs.forEach( f -> {
-////                printListWithIndexes(nn.assign(getSmallImageFVArr(f)));
-//                int[][] index = new int[1][K];
-//                double[][] distances = new double[1][K];
-//                dnn.searchKNN(new double[][] {getSmallImageFVArr(f)}, K, index, distances);
-//                System.out.println("is");
-//                for (int[] ints : index) {
-//                    System.out.print("\t");printListWithIndexes(ints);
-//                }
-//                System.out.println("ds");
-//                for (double[] ints : distances) {
-//                    System.out.print("\t");printListWithIndexes(ints);
-//                }
-//            });
-//            System.out.println("--------------");
-//        });
-
-        /*
-
-        int[] assignment = assignRandomImage(nn, testing);
-        printListWithIndexes(assignment);
-
-        assignment = assignRandomImage(nn, testing);
-        printListWithIndexes(assignment);*/
-
-        /*// train based on stuff I guess
-        List<NNDataPoint> featureSpace = new ArrayList<>();
-        train.forEach( (s, fs) -> {
-//            System.out.println("####");
-            fs.forEach( f -> {
-//                System.out.println("s = " + s);
-                featureSpace.add(new NNDataPoint(s, getSmallImageFV(f)));
-            });
-//            System.out.println("####");
-        });
-
-        System.out.println(featureSpace);
-
-        final int K = 5;
-        for (int i = 1; i < 50; i++) {
-            System.out.println("-------------\ni = " + i);
-            dothething(test, featureSpace, i);
-        }*/
-
-
-//        List<double[]> ds = new ArrayList<>();
-//        List<int[]> assigns = new ArrayList<>();
-//        List<double[]> weights = new ArrayList<>();
-//
-//        final int[] i = {0};
-//        train.forEach( (s, fs) -> {
-//            System.out.println("s = " + s);
-//
-//            fs.forEach( f -> {
-//                ds.add(getSmallImageFVArr(f));
-//                double[] w = {1};
-//                int[] a = {i[0]};
-////                Arrays.fill(a, i[0]);
-////                Arrays.fill(w, 1);
-//                weights.add(w);
-//                assigns.add(a);
-//            });
-//
-//            classIntPairs.put(s, i[0]++);
-//        });
-//
-//        double[][] datapoints = ds.toArray(new double[0][]);
-//        int[][] dataassignments = assigns.toArray(new int[0][]);
-//        double[][] dataweights = weights.toArray(new double[0][]);
-//
-//        nn.assignWeighted(datapoints, dataassignments, dataweights);
-
-//        System.out.println("classIntPairs = " + classIntPairs);
-
-
-
-
-//        featureSpace.forEach( (i, fv) -> {
-//            final FImage[] closest = {null, i};
-//            final Double[] minDist = {Double.MAX_VALUE};
-//            featureSpace.forEach( (i2, fv2) -> {
-//                if (!i.equals(i2)) {
-//                    Double dist = fv.compare(fv2, DoubleFVComparison.EUCLIDEAN);
-//                    if (dist < minDist[0] || closest[0] == null) {
-//                        minDist[0] = dist;
-//                        closest[0] = i2;
-//                    }
-//                }
-//            });
-//            DisplayUtilities.display(minDist[0].toString(), closest);
-//        });
-
-
-    }
-
-    private static void dothething(GroupedDataset<String, ListDataset<FImage>, FImage> test, List<NNDataPoint> featureSpace, int K) {
-        final int[] incorrect = {0};
-        final int[] correct = {0};
-
-        // test based on test set with known classifiers
-        test.forEach( (s, fs) -> {
-            fs.forEach( f -> {
-//                DisplayUtilities.display(f);
-//                System.out.println("--------------");
-                Map<Double, String> distances = new TreeMap<>();
-                NNDataPoint nnp = new NNDataPoint(s, getSmallImageFV(f));
-                featureSpace.forEach( dp -> {
-//                    System.out.println(dp.compareTo(nnp.fv));
-                    distances.put(dp.compareTo(nnp.fv), dp.classifier);
-                });
-                String[] vals = distances.values().toArray(new String[K]);
-                Map<String, Integer> classOccurences = new HashMap<>(vals.length);
-//                System.out.println(distances.entrySet());
-                for (int k = 0; k < K; k++) {
-                    if (vals[k] == null)
-                        continue;
-
-                    classOccurences.computeIfPresent(vals[k], (str, i) -> i+1);
-                    classOccurences.putIfAbsent(vals[k], 1);
-                }
-                final String[] max = new String[1];
-                final int[] maxOcc = {0};
-                classOccurences.forEach( (c, o) -> {
-                    if (o > maxOcc[0]) {
-                        maxOcc[0] = o;
-                        max[0] = c;
-                    }
-                });
-//                System.out.println(classOccurences);
-//                System.out.println(featureSpace);
-//                System.out.println(max[0]+" occurred "+maxOcc[0]+" times");
-                if (max[0].equals(s))
+            fs.forEach( (f) -> {
+                int[] r = nn.assign(getSmallImageFVArr(f));
+                String classifier = findMajority(r, classes);
+                System.out.println("---=="+classifier+"==---");
+                if (classifier.equals(s))
                     correct[0]++;
                 else
                     incorrect[0]++;
-//                DisplayUtilities.display(max[0], f);
+
+                printListWithIndexes(r);
             });
         });
 
-        System.out.println(correct[0]+" correct");
-        System.out.println(incorrect[0]+" incorrect");
-        System.out.println(correct[0]/incorrect[0]+" ratio");
+        System.out.println("REPORT:\n" +
+                "Correct: "+correct[0]+"\n" +
+                "Incorrect: "+incorrect[0]+"\n" +
+                "Accuracy: "+(100 * correct[0]/(correct[0]+incorrect[0]))+"%");
     }
 
-    private static int[] assignRandomImage(DoubleKNNAssigner nn, GroupedDataset<String, ListDataset<FImage>, FImage> testing) {
-        FImage test = testing.getRandomInstance();
-        return nn.assign(getSmallImageFVArr(test));
+    private static String findMajority(int[] neighbours, List<String> classes) {
+        Map<String, Integer> occur = new HashMap<>();
+        for (int neighbour : neighbours) {
+            occur.computeIfPresent(classes.get(neighbour), (s,i) -> (i+1));
+            occur.putIfAbsent(classes.get(neighbour),1);
+        }
+
+        final String[] maxClass = {null};
+        int occurs = 0;
+        occur.forEach( (s, c) -> {
+            if (c > occurs || maxClass[0] == null) {
+                c = occurs;
+                maxClass[0] = s;
+            }
+        });
+
+        return maxClass[0];
     }
 
     private static void printListWithIndexes(int[] assignment) {
@@ -285,16 +142,6 @@ public class SmallImageClassifier {
             System.out.print(ass + /*"[" + n + "]*/"\t");
         }
         System.out.println();
-    }
-
-    private static void printZeroIndex(int[] assignment) {
-        for (int n = 0; n < assignment.length; n++) {
-            int ass = assignment[n];
-            if (ass == 0) {
-                System.out.println("i:"+n+" = "+ass);
-                break;
-            }
-        }
     }
 
 }
