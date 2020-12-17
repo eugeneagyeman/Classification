@@ -9,11 +9,17 @@ import org.openimaj.image.DisplayUtilities;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.processing.resize.ResizeProcessor;
+import org.openimaj.knn.DoubleNearestNeighboursExact;
 import org.openimaj.ml.clustering.assignment.soft.DoubleKNNAssigner;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
+/**
+ * OK so next challenge is to use the KNNClassifier classes - feed data and read from indices
+ * Work out the ouput - NOT ACCURATE (maybe use another classifier to work it out?)
+ */
 public class SmallImageClassifier {
 
 
@@ -81,17 +87,19 @@ public class SmallImageClassifier {
 //        croppedImage=img.extractROI(centreX-(cropW/2), centreY-(cropH/2), boxSiz, boxSiz);
 //        DisplayUtilities.display(img);
 //        DisplayUtilities.display(croppedImage);
-
-        VFSGroupDataset<FImage> groups = new VFSGroupDataset<>("zip:C:\\Users\\Tim\\Documents\\VisionProjects\\classification/training.zip", ImageUtilities.FIMAGE_READER);
+        File workingDir = new File("../classification");
+        VFSGroupDataset<FImage> groups = new VFSGroupDataset<>("zip:"+workingDir.getAbsolutePath()+"/training.zip", ImageUtilities.FIMAGE_READER);
         GroupedRandomSplitter<String, FImage> splitter = new GroupedRandomSplitter<>(groups, groups.size()/2, 0, groups.size()/2);
         GroupedDataset<String, ListDataset<FImage>, FImage> train = splitter.getTrainingDataset();
         GroupedDataset<String, ListDataset<FImage>, FImage> test = splitter.getTestDataset();
-        /*Map<FImage, double[]> featureSpace = new HashMap<>();
+
+        Map<FImage, double[]> featureSpace = new HashMap<>();
         Map<String, Integer> classIntPairs = new HashMap<>();
 
         double[][] ds = new double[train.size()][256];
         final int[] i = {0};
         final int K = 16;
+
         train.forEach( (s, fs) -> {
             FImage image = fs.getRandomInstance();
             featureSpace.put(image, getSmallImageFVArr(image));
@@ -104,24 +112,34 @@ public class SmallImageClassifier {
 
         DoubleNearestNeighboursExact dnn = new DoubleNearestNeighboursExact(ds);
 
-        train.forEach( (s, fs) -> {
-            System.out.println("-------"+s+"-------");
-            fs.forEach( f -> {
-//                printListWithIndexes(nn.assign(getSmallImageFVArr(f)));
-                int[][] index = new int[1][K];
-                double[][] distances = new double[1][K];
-                dnn.searchKNN(new double[][] {getSmallImageFVArr(f)}, K, index, distances);
-                System.out.println("is");
-                for (int[] ints : index) {
-                    System.out.print("\t");printListWithIndexes(ints);
-                }
-                System.out.println("ds");
-                for (double[] ints : distances) {
-                    System.out.print("\t");printListWithIndexes(ints);
-                }
-            });
-            System.out.println("--------------");
+        test.forEach( (s, fs) -> {
+            System.out.println("---"+s+"---");
+            FImage f = fs.get(0);
+            int[] r = nn.assign(getSmallImageFVArr(f));
+            printListWithIndexes(r);
+
         });
+
+//        train.forEach( (s, fs) -> {
+//            System.out.println("-------"+s+"-------");
+//            fs.forEach( f -> {
+////                printListWithIndexes(nn.assign(getSmallImageFVArr(f)));
+//                int[][] index = new int[1][K];
+//                double[][] distances = new double[1][K];
+//                dnn.searchKNN(new double[][] {getSmallImageFVArr(f)}, K, index, distances);
+//                System.out.println("is");
+//                for (int[] ints : index) {
+//                    System.out.print("\t");printListWithIndexes(ints);
+//                }
+//                System.out.println("ds");
+//                for (double[] ints : distances) {
+//                    System.out.print("\t");printListWithIndexes(ints);
+//                }
+//            });
+//            System.out.println("--------------");
+//        });
+
+        /*
 
         int[] assignment = assignRandomImage(nn, testing);
         printListWithIndexes(assignment);
@@ -129,7 +147,7 @@ public class SmallImageClassifier {
         assignment = assignRandomImage(nn, testing);
         printListWithIndexes(assignment);*/
 
-        // train based on stuff I guess
+        /*// train based on stuff I guess
         List<NNDataPoint> featureSpace = new ArrayList<>();
         train.forEach( (s, fs) -> {
 //            System.out.println("####");
@@ -146,7 +164,7 @@ public class SmallImageClassifier {
         for (int i = 1; i < 50; i++) {
             System.out.println("-------------\ni = " + i);
             dothething(test, featureSpace, i);
-        }
+        }*/
 
 
 //        List<double[]> ds = new ArrayList<>();
