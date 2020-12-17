@@ -23,12 +23,14 @@ import java.util.*;
  */
 public class SmallImageClassifier {
 
+    static int CROP_FACTOR = 4;
+
     public static DoubleFV getSmallImageFV(FImage img) {
         FImage croppedImage;
         DoubleFV featureVector;
 
-        final int cropW = img.width/4;
-        final int cropH = img.height/4;
+        final int cropW = img.width/CROP_FACTOR;
+        final int cropH = img.height/CROP_FACTOR;
         final int centreX=img.width/2;
         final int centreY=img.height/2;
 
@@ -52,61 +54,61 @@ public class SmallImageClassifier {
     }
 
     public static void main(String[] args) throws IOException {
+            File workingDir = new File("../classification");
+            VFSGroupDataset<FImage> groups = new VFSGroupDataset<>("zip:" + workingDir.getAbsolutePath() + "/training.zip", ImageUtilities.FIMAGE_READER);
+            int splitSize = 75; // ideal as each group has 100 images --> 50 each
+            System.out.println("splitSize = " + splitSize);
 
-        File workingDir = new File("../classification");
-        VFSGroupDataset<FImage> groups = new VFSGroupDataset<>("zip:"+workingDir.getAbsolutePath()+"/training.zip", ImageUtilities.FIMAGE_READER);
-        int splitSize = 50; // ideal as each group has 100 images --> 50 each
-        System.out.println("splitSize = " + splitSize);
+            GroupedRandomSplitter<String, FImage> splitter = new GroupedRandomSplitter<>(groups, splitSize, 0, splitSize);
+            GroupedDataset<String, ListDataset<FImage>, FImage> train = splitter.getTrainingDataset();
+            GroupedDataset<String, ListDataset<FImage>, FImage> test = splitter.getTestDataset();
 
-        GroupedRandomSplitter<String, FImage> splitter = new GroupedRandomSplitter<>(groups, splitSize, 0, splitSize);
-        GroupedDataset<String, ListDataset<FImage>, FImage> train = splitter.getTrainingDataset();
-        GroupedDataset<String, ListDataset<FImage>, FImage> test = splitter.getTestDataset();
-
-        List<String> classes = new ArrayList<>();
+            List<String> classes = new ArrayList<>();
 
 //        int maxSiz = getMaxSize(train);
 
-        List<double[]> featureSpace = new ArrayList<>();
+            List<double[]> featureSpace = new ArrayList<>();
 //        final int K = 5;
 
-        train.forEach( (s, fs) -> {
-            FImage image = fs.getRandomInstance();
-            fs.forEach( f -> {
-                double[] fv = getSmallImageFVArr(image);
-                featureSpace.add(fv);
-                classes.add(s);
+            train.forEach((s, fs) -> {
+                FImage image = fs.getRandomInstance();
+                fs.forEach(f -> {
+                    double[] fv = getSmallImageFVArr(image);
+                    featureSpace.add(fv);
+                    classes.add(s);
+                });
             });
-        });
 
-        System.out.println("featureSpace.size() = " + featureSpace.size());
-        final int K = (int) Math.sqrt(featureSpace.size());
-        double[][] ds = featureSpace.toArray(new double[featureSpace.size()][256]);
+            System.out.println("featureSpace.size() = " + featureSpace.size());
+            final int K = (int) Math.sqrt(featureSpace.size());
+            double[][] ds = featureSpace.toArray(new double[featureSpace.size()][256]);
 
-        DoubleKNNAssigner nn = new DoubleKNNAssigner(ds, DoubleFVComparison.EUCLIDEAN, K);
+            DoubleKNNAssigner nn = new DoubleKNNAssigner(ds, DoubleFVComparison.EUCLIDEAN, K);
 
-        final double[] correct = {0};
-        final double[] incorrect = {0};
+            final double[] correct = {0};
+            final double[] incorrect = {0};
 
-        System.out.println(classes);
-        test.forEach( (s, fs) -> {
-            System.out.println("---"+s+"---");
-            fs.forEach( (f) -> {
-                int[] r = nn.assign(getSmallImageFVArr(f));
-                String classifier = findMajority(r, classes);
-                System.out.println("---=="+classifier+"==---");
-                if (classifier.equals(s))
-                    correct[0]++;
-                else
-                    incorrect[0]++;
-
-                printListWithIndexes(r);
+            System.out.println(classes);
+            test.forEach((s, fs) -> {
+//                System.out.println("---" + s + "---");
+                fs.forEach((f) -> {
+                    int[] r = nn.assign(getSmallImageFVArr(f));
+                    String classifier = findMajority(r, classes);
+//                    System.out.println("---==" + classifier + "==---");
+                    if (classifier.equals(s))
+                        correct[0]++;
+                    else
+                        incorrect[0]++;
+                    classes.add(classifier);
+//                    printListWithIndexes(r);
+                });
             });
-        });
 
-        System.out.println("REPORT:\n" +
-                "Correct: "+correct[0]+"\n" +
-                "Incorrect: "+incorrect[0]+"\n" +
-                "Accuracy: "+(100 * correct[0]/(correct[0]+incorrect[0]))+"%");
+            System.out.println("REPORT:\n" +
+                    "Correct: " + correct[0] + "\n" +
+                    "Incorrect: " + incorrect[0] + "\n" +
+                    "Accuracy: " + (100 * correct[0] / (correct[0] + incorrect[0])) + "%");
+            System.out.println("CROP_FACTOR = " + CROP_FACTOR);
     }
 
     private static String findMajority(int[] neighbours, List<String> classes) {
