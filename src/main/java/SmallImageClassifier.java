@@ -51,25 +51,6 @@ public class SmallImageClassifier {
         return getSmallImageFV(img).values;
     }
 
-    private static String findMajority(int[] neighbours, List<String> classes) {
-        Map<String, Integer> occur = new HashMap<>();
-        for (int neighbour : neighbours) {
-            occur.computeIfPresent(classes.get(neighbour), (s,i) -> (i+1));
-            occur.putIfAbsent(classes.get(neighbour),1);
-        }
-
-        final String[] maxClass = {null};
-        int occurs = 0;
-        occur.forEach( (s, c) -> {
-            if (c > occurs || maxClass[0] == null) {
-                c = occurs;
-                maxClass[0] = s;
-            }
-        });
-
-        return maxClass[0];
-    }
-
     private static String findMajority(int[] neighbours, double[][] dataset,  Map<double[], String> classes) {
         Map<String, Integer> occur = new HashMap<>();
         for (int neighbourI : neighbours) {
@@ -122,18 +103,15 @@ public class SmallImageClassifier {
         final double[] incorrect = {0};
 
         test.forEach((s, fs) -> {
-//                System.out.println("---" + s + "---");
             fs.forEach((f) -> {
                 double[] fv = getSmallImageFVArr(f);
                 int[] r = nn.assign(fv);
-                String oClassifier = findMajority(r, ds, classesPairs);
-//                    System.out.println("---==" + classifier + "==---");
-                if (oClassifier.equals(s))
+                String classifier = findMajority(r, ds, classesPairs);
+                if (classifier.equals(s))
                     correct[0]++;
                 else
                     incorrect[0]++;
-                classesPairs.put(fv, oClassifier);
-//                    printListWithIndexes(r);
+                classesPairs.put(fv, classifier);
             });
         });
 
