@@ -51,6 +51,36 @@ public class SmallImageClassifier {
         return getSmallImageFV(img).values;
     }
 
+    public static double[] centredNormalisedFV(FImage img) {
+        return normaliseVector(meanCentredVector(getSmallImageFVArr(img)));
+    }
+
+    public static double[] meanCentredVector(double[] vector) {
+        if (vector.length == 0)
+            return vector;
+
+        int s = 0;
+        for (double v : vector) {
+            s+=v;
+        }
+        double m = s/vector.length;
+        double[] newV = new double[vector.length];
+        for (int i = 0; i < newV.length; i++) {
+            newV[i] = vector[i] - m;
+        }
+
+        return newV;
+    }
+
+    public static double[] normaliseVector(double[] vector) {
+        DoubleFV fv = normaliseVector(new DoubleFV(vector));
+        return fv.values;
+    }
+
+    public static DoubleFV normaliseVector(DoubleFV fv) {
+        return fv.normaliseFV();
+    }
+
     private static String findMajority(int[] neighbours, double[][] dataset,  Map<double[], String> classes) {
         Map<String, Integer> occur = new HashMap<>();
         for (int neighbourI : neighbours) {
@@ -73,21 +103,20 @@ public class SmallImageClassifier {
 
     public static void main(String[] args) throws IOException {
         File workingDir = new File("../classification");
-        VFSGroupDataset<FImage> groups = new VFSGroupDataset<>("zip:" + workingDir.getAbsolutePath() + "/training.zip", ImageUtilities.FIMAGE_READER);
+        VFSGroupDataset<FImage> train = new VFSGroupDataset<>("zip:" + workingDir.getAbsolutePath() + "/training.zip", ImageUtilities.FIMAGE_READER);
         int splitSize = 75; // ideal as each group has 100 images --> 50 each
         System.out.println("splitSize = " + splitSize);
 
-        GroupedRandomSplitter<String, FImage> splitter = new GroupedRandomSplitter<>(groups, splitSize, 0, splitSize);
-        GroupedDataset<String, ListDataset<FImage>, FImage> train = splitter.getTrainingDataset();
-        GroupedDataset<String, ListDataset<FImage>, FImage> test = splitter.getTestDataset();
+        VFSGroupDataset<FImage> test=train;
 
         Map<double[], String> classesPairs = new HashMap<>();
 
         List<double[]> featureSpace = new ArrayList<>();
 
         train.forEach((s, fs) -> {
+            System.out.println(s);
             fs.forEach(f -> {
-                double[] fv = getSmallImageFVArr(f);
+                double[] fv = centredNormalisedFV(f);
                 featureSpace.add(fv);
                 classesPairs.put(fv, s);
             });
@@ -104,7 +133,7 @@ public class SmallImageClassifier {
 
         test.forEach((s, fs) -> {
             fs.forEach((f) -> {
-                double[] fv = getSmallImageFVArr(f);
+                double[] fv = centredNormalisedFV(f);
                 int[] r = nn.assign(fv);
                 String classifier = findMajority(r, ds, classesPairs);
                 if (classifier.equals(s))
