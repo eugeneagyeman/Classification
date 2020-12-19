@@ -1,10 +1,14 @@
+import org.apache.commons.vfs2.FileName;
+import org.apache.commons.vfs2.FileObject;
 import org.openimaj.data.dataset.GroupedDataset;
 import org.openimaj.data.dataset.ListDataset;
 import org.openimaj.data.dataset.VFSGroupDataset;
+import org.openimaj.data.dataset.VFSListDataset;
 import org.openimaj.experiment.dataset.split.GroupedRandomSplitter;
 import org.openimaj.feature.DoubleFV;
 import org.openimaj.feature.DoubleFVComparison;
 import org.openimaj.feature.FloatFV;
+import org.openimaj.image.DisplayUtilities;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.processing.resize.ResizeProcessor;
@@ -27,15 +31,8 @@ public class SmallImageClassifier {
         FImage croppedImage;
         DoubleFV featureVector;
 
-        final int cropW = img.width/ BOX_SIZE_FACTOR;
-        final int cropH = img.height/ BOX_SIZE_FACTOR;
-        final int centreX=img.width/2;
-        final int centreY=img.height/2;
+        croppedImage = cropImage(img);
 
-        final int boxSiz = (cropW < cropH)  ? cropW : cropH;
-
-        croppedImage=img.extractROI(centreX-(cropW/2), centreY-(cropH/2), boxSiz, boxSiz);
-        croppedImage.processInplace(new ResizeProcessor(CROP_SIZE_PX,CROP_SIZE_PX));
         FloatFV ffv = null;
         for (float[] pixel : croppedImage.pixels) {
             if (ffv == null)
@@ -47,12 +44,26 @@ public class SmallImageClassifier {
         return featureVector;
     }
 
+    private static FImage cropImage(FImage img) {
+        FImage croppedImage;
+        final int cropW = img.width/ BOX_SIZE_FACTOR;
+        final int cropH = img.height/ BOX_SIZE_FACTOR;
+        final int centreX=img.width/2;
+        final int centreY=img.height/2;
+
+        final int boxSiz = (cropW < cropH)  ? cropW : cropH;
+
+        croppedImage=img.extractROI(centreX-(cropW/2), centreY-(cropH/2), boxSiz, boxSiz);
+        croppedImage.processInplace(new ResizeProcessor(CROP_SIZE_PX,CROP_SIZE_PX));
+        return croppedImage;
+    }
+
     public static double[] getSmallImageFVArr(FImage img) {
         return getSmallImageFV(img).values;
     }
 
     public static double[] centredNormalisedFV(FImage img) {
-        return normaliseVector(meanCentredVector(getSmallImageFVArr(img)));
+        return meanCentredVector(normaliseVector(getSmallImageFVArr(img)));
     }
 
     public static double[] meanCentredVector(double[] vector) {
@@ -107,7 +118,9 @@ public class SmallImageClassifier {
         int splitSize = 75; // ideal as each group has 100 images --> 50 each
         System.out.println("splitSize = " + splitSize);
 
-        VFSGroupDataset<FImage> test=train;
+        VFSListDataset<FImage> test = new VFSListDataset<>("zip:" + workingDir.getAbsolutePath() + "/testing.zip", ImageUtilities.FIMAGE_READER);
+        VFSGroupDataset<FImage> tests = new VFSGroupDataset<>("zip:" + workingDir.getAbsolutePath() + "/testing.zip", ImageUtilities.FIMAGE_READER);
+
 
         Map<double[], String> classesPairs = new HashMap<>();
 
@@ -131,24 +144,36 @@ public class SmallImageClassifier {
         final double[] correct = {0};
         final double[] incorrect = {0};
 
-        test.forEach((s, fs) -> {
-            fs.forEach((f) -> {
+//        test.forEach(f -> {
+//            double[] fv = centredNormalisedFV(f);
+//                int[] r = nn.assign(fv);
+//                String classifier = findMajority(r, ds, classesPairs);
+//                classesPairs.put(fv, classifier);
+//        });
+
+        Writer w = new Writer("run1.txt");
+        tests.forEach((s,fs) -> {
+            for (int i = 0; i < fs.numInstances(); i++) {
+                FImage f = fs.getInstance(i);
+                FileObject fo = fs.getFileObject(i);
+
                 double[] fv = centredNormalisedFV(f);
                 int[] r = nn.assign(fv);
                 String classifier = findMajority(r, ds, classesPairs);
-                if (classifier.equals(s))
-                    correct[0]++;
-                else
-                    incorrect[0]++;
                 classesPairs.put(fv, classifier);
-            });
-        });
 
-        System.out.println("REPORT:\n" +
+                String name = fo.getName().getBaseName();
+                w.write(name +" "+classifier+"\n");
+                w.flush();
+            }
+        });
+        w.closeFile();
+
+        /*System.out.println("REPORT:\n" +
                 "Correct: " + correct[0] + "\n" +
                 "Incorrect: " + incorrect[0] + "\n" +
                 "Accuracy: " + (100 * correct[0] / (correct[0] + incorrect[0])) + "%");
-        System.out.println("CROP_FACTOR = " + BOX_SIZE_FACTOR);
+        System.out.println("CROP_FACTOR = " + BOX_SIZE_FACTOR);*/
     }
 
     private static void printListWithIndexes(int[] assignment) {
