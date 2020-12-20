@@ -17,7 +17,7 @@ public class Writer {
 
     /**
      * Automatically creates a file in the working directory under the name
-     * {@code: run<runNo>.txt}.
+     * <tt>run[runNo].txt</tt>.
      * @param runNo
      */
     public Writer(int runNo) {
