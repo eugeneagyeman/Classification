@@ -72,13 +72,4 @@ public class Writer {
         }
     }
 
-    public static void main(String[] args) {
-        Writer w = new Writer(2);
-        System.out.println(w.writeStr("dnlk"));
-        System.out.println(w.writeStr("\tkjrgnl"));
-        System.out.println(w.writeStr("kjrgnl\n"));
-        System.out.println(w.writeStr("kjrgnl\n"));
-        System.out.println(w.flush());
-    }
-
 }
