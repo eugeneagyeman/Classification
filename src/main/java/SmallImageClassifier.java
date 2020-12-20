@@ -1,14 +1,9 @@
-import org.apache.commons.vfs2.FileName;
 import org.apache.commons.vfs2.FileObject;
-import org.openimaj.data.dataset.GroupedDataset;
-import org.openimaj.data.dataset.ListDataset;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
-import org.openimaj.experiment.dataset.split.GroupedRandomSplitter;
 import org.openimaj.feature.DoubleFV;
 import org.openimaj.feature.DoubleFVComparison;
 import org.openimaj.feature.FloatFV;
-import org.openimaj.image.DisplayUtilities;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.processing.resize.ResizeProcessor;
@@ -151,7 +146,7 @@ public class SmallImageClassifier {
 //                classesPairs.put(fv, classifier);
 //        });
 
-        Writer w = new Writer("run1.txt");
+        Writer w = new Writer(1);
         tests.forEach((s,fs) -> {
             for (int i = 0; i < fs.numInstances(); i++) {
                 FImage f = fs.getInstance(i);
@@ -162,8 +157,7 @@ public class SmallImageClassifier {
                 String classifier = findMajority(r, ds, classesPairs);
                 classesPairs.put(fv, classifier);
 
-                String name = fo.getName().getBaseName();
-                w.write(name +" "+classifier+"\n");
+                w.writeResult(fo, classifier);
                 w.flush();
             }
         });

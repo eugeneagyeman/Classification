@@ -1,20 +1,47 @@
+import org.apache.commons.vfs2.FileObject;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Map;
 
 public class Writer {
 
     FileWriter writer;
+    String path;
 
-    public Writer(String path) {
-        File f = new File(path);
+    public Writer(int runNo) {
+        path = "run" + runNo + ".txt";
         try {
             writer = new FileWriter(path);
         } catch (IOException e) {
         }
     }
 
-    public int write(String str) {
+    public int reopenFile() {
+        try {
+            writer = new FileWriter(path);
+            return 0;
+        } catch (IOException e) {
+            return -1;
+        }
+    }
+
+    public int writeResult(FileObject imageFile, String classifier) {
+        return writeStr(imageFile.getName().getBaseName()+" "+classifier+"\n");
+    }
+
+    public int writeResults(Map<FileObject, String> results) {
+        final int[] r = {1};
+        results.forEach( (fo, c) -> {
+            r[0] &=
+                    writeResult(fo, c);
+        });
+
+        return r[0]-1;
+    }
+
+    public int writeStr(String str) {
         try {
             writer.write(str);
             return 0;
@@ -46,11 +73,11 @@ public class Writer {
     }
 
     public static void main(String[] args) {
-        Writer w = new Writer("file.txt");
-        System.out.println(w.write("dnlk"));
-        System.out.println(w.write("\tkjrgnl"));
-        System.out.println(w.write("kjrgnl\n"));
-        System.out.println(w.write("kjrgnl\n"));
+        Writer w = new Writer(2);
+        System.out.println(w.writeStr("dnlk"));
+        System.out.println(w.writeStr("\tkjrgnl"));
+        System.out.println(w.writeStr("kjrgnl\n"));
+        System.out.println(w.writeStr("kjrgnl\n"));
         System.out.println(w.flush());
     }
 
