@@ -30,7 +30,7 @@ import java.util.Map;
 public class Run2 {
 
     final static int SAMPLE_SIZE = 100;
-    final static int SAMPLEGAP = 30;
+    final static int SAMPLE_GAP = 30;
 
     public static void main(String[] args) throws IOException {
         Run2 testRun = new Run2();
@@ -43,8 +43,8 @@ public class Run2 {
         VFSGroupDataset<FImage> tests = new VFSGroupDataset<>("zip:" + workingDir.getAbsolutePath() + "/testing.zip", ImageUtilities.FIMAGE_READER);
 
         //testing picture
-        DisplayUtilities.displayName(train.get("bedroom").get(0),"testImage");
-        ArrayList<float[][]> testPatches = testRun.patchMakerTest(train.get("bedroom").get(0));
+        //DisplayUtilities.displayName(train.get("bedroom").get(0),"testImage");
+        //ArrayList<float[][]> testPatches = testRun.patchMakerTest(train.get("bedroom").get(0));
 
         //testing 1d array thingy
         ArrayList<float[]> testing1dArray = testRun.patchMaker(train.get("bedroom").get(0));
@@ -54,6 +54,7 @@ public class Run2 {
             System.out.println("not the same");
         }
 
+        /*
         for(int i = 0 ; i < testPatches.size() ; i++){
             FImage imgTest = new FImage(testPatches.get(i));
             DisplayUtilities.displayName(imgTest, "Patch"+i);
@@ -61,51 +62,12 @@ public class Run2 {
             System.out.println("Patch " + i + " : " +testPatches.get(i));
         }
 
-        /*
-        //trying to display each patch
-        for(int i = 0 ; i < 10 ; i++){
-            FImage imgTest = new FImage(testPatches[i]);
-            DisplayUtilities.displayName(imgTest, "Patch"+i);
-            //DisplayUtilities.display(imgTest);
-            //System.out.println("Patch " + i + " : " +testPatches.get(i));
-        }
-        */
-        //ArrayList<int[]> t = testRun.testingEditing();
+         */
 
     }
 
 
     /*
-    public ArrayList<int[]> testingEditing(){
-        ArrayList<int[]> test = new ArrayList<>();
-        int[] toAdd = new int[10];
-
-
-        for (int outsideCounter = 0; outsideCounter < 5; outsideCounter++){
-            int pointer = 0;
-            for(int counter = 2 ; counter < 11; counter++){
-                if (!test.isEmpty()){
-                    toAdd[pointer] = counter*counter*counter;
-
-                }else{
-                    toAdd[pointer] = counter*counter;
-                }
-                pointer++;
-
-            }
-            System.out.println("num at pos 0 " + toAdd[0]);
-            System.out.println(toAdd);
-            test.add(toAdd);
-        }
-
-        for(int i = 0 ; i< 5 ; i++){
-            System.out.println(test.get(i));
-        }
-
-        return test;
-    }
-    */
-
     //returns an arraylist of pixel patches for the image parsed in
     public ArrayList<float[][]> patchMakerTest(FImage img) {
         //size of image
@@ -118,10 +80,10 @@ public class Run2 {
 
         //int linearCounter = 0;
 
-        for (int pixelPointerX = 0; pixelPointerX < imgRows; pixelPointerX += SAMPLEGAP) {
+        for (int pixelPointerX = 0; pixelPointerX < imgRows; pixelPointerX += SAMPLE_GAP) {
             if ((pixelPointerX + SAMPLE_SIZE - 1) < imgRows) { //checking if there is space vertically for template
 
-                for (int pixelPointerY = 0; pixelPointerY < imgCols; pixelPointerY += SAMPLEGAP) {
+                for (int pixelPointerY = 0; pixelPointerY < imgCols; pixelPointerY += SAMPLE_GAP) {
                     if ((pixelPointerY + SAMPLE_SIZE - 1) < imgCols) { //checking if there is space horizontally
                         float[][] patchTemplate = new float[SAMPLE_SIZE][SAMPLE_SIZE];
 
@@ -132,11 +94,7 @@ public class Run2 {
                         }
 
                         allPatches.add(patchTemplate);
-                        //ttt[linearCounter] = patchTemplate;
-                        //DisplayUtilities.display(new FImage(patchTemplate));
-                        //DisplayUtilities.display(new FImage(ttt[linearCounter]));
-                        //DisplayUtilities.display(new FImage(allPatches.get(0)));
-                        //linearCounter++;
+
                     }
 
 
@@ -145,32 +103,10 @@ public class Run2 {
 
         }
 
-        //DisplayUtilities.display(new FImage(ttt[0]));
-
-
-        /*
-        for(int i = 0 ; i < 10 ; i++){
-            FImage imgTest = new FImage(ttt[i]);
-            DisplayUtilities.displayName(imgTest, "Patch"+i);
-            //DisplayUtilities.display(imgTest);
-            System.out.println("Patch " + i + " : " +ttt[i]);
-        }*/
-
-        /*
-        for(int i = 0 ; i < allPatches.size() ; i++){
-            FImage imgTest = new FImage(allPatches.get(i));
-            DisplayUtilities.displayName(imgTest, "Patch"+i);
-            //DisplayUtilities.display(imgTest);
-            System.out.println("Patch " + i + " : " +allPatches.get(i));
-        }*/
-
-
-
-        //System.out.println(allPatches.size());
         return allPatches;
 
     }
-
+    */
 
     //returns an arraylist of pixel patches for the image parsed in
     public ArrayList<float[]> patchMaker(FImage img) {
@@ -179,15 +115,16 @@ public class Run2 {
         int imgCols = img.getCols();
 
         float[][] patchTemplate = new float[SAMPLE_SIZE][SAMPLE_SIZE];
-        float[] patch = new float[SAMPLE_SIZE * SAMPLE_SIZE];
         ArrayList<float[]> allPatches = new ArrayList<>();
 
-        for (int pixelPointerX = 0; pixelPointerX < imgRows; pixelPointerX += SAMPLEGAP) {
-            if ((pixelPointerX + patchTemplate.length - 1) < imgRows) { //checking if there is space vertically for template
+        for (int pixelPointerX = 0; pixelPointerX < imgRows; pixelPointerX += SAMPLE_GAP) {
+            if ((pixelPointerX + SAMPLE_SIZE - 1) < imgRows) { //checking if there is space vertically for template
 
-                for (int pixelPointerY = 0; pixelPointerY < imgCols; pixelPointerY += SAMPLEGAP) {
-                    int linearCounter = 0;
-                    if ((pixelPointerY + patchTemplate[0].length - 1) < imgCols) { //checking if there is space horizontally
+                for (int pixelPointerY = 0; pixelPointerY < imgCols; pixelPointerY += SAMPLE_GAP) {
+                    if ((pixelPointerY + SAMPLE_SIZE - 1) < imgCols) { //checking if there is space horizontally
+
+                        int linearCounter = 0;
+                        float[] patch = new float[SAMPLE_SIZE * SAMPLE_SIZE];
 
                         for (int patchPointerX = 0; patchPointerX < patchTemplate.length; patchPointerX++) {
                             for (int patchPointerY = 0; patchPointerY < patchTemplate[patchPointerX].length; patchPointerY++) {
@@ -203,7 +140,7 @@ public class Run2 {
             }
         }
 
-        System.out.println(allPatches.size());
+        //System.out.println(allPatches.size());
         return allPatches;
 
     }
