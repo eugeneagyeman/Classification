@@ -1,5 +1,7 @@
 package Run2;
 
+import org.openimaj.data.DataSource;
+import org.openimaj.data.DoubleArrayBackedDataSource;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
 import org.openimaj.feature.DoubleFV;
@@ -7,10 +9,13 @@ import org.openimaj.image.DisplayUtilities;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.ml.clustering.assignment.HardAssigner;
+import org.openimaj.ml.clustering.kmeans.DoubleKMeans;
+import org.openimaj.util.pair.IntDoublePair;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 /** To do list:
@@ -210,13 +215,14 @@ public class Run2 {
 
 
 
-    public static HardAssigner<double[], double[],float[]> trainQuantiser(VFSGroupDataset<FImage> trainingSet, Run2 r) {
+    public static HardAssigner<double[], double[], IntDoublePair> trainQuantiser(VFSGroupDataset<FImage> trainingSet, Run2 r) {
         List<List<double[]>> allkeys = new ArrayList<>();
         //list that contains each image, and in each image contains all the features.
 
         int imgCounter = 0;
         for (FImage rec : trainingSet) {
             FImage img = rec.getImage();
+
 
             //image sampling occurs here, can swap different methods in e.g normalise or not
             //r.patchMaker(img);
@@ -225,14 +231,11 @@ public class Run2 {
             imgCounter++;
         }
 
-        if (allkeys.size() > 10000)
-            allkeys = allkeys.subList(0, 10000);
 
-        //double kmeans -> use this
-
-        ByteKMeans km = ByteKMeans.createKDTreeEnsemble(300);
-        DataSource<byte[]> datasource = new LocalFeatureListDataSource<ByteDSIFTKeypoint, byte[]>(allkeys);
-        ByteCentroidsResult result = km.cluster(datasource);
+        //double kmeans -> use this probs
+        DoubleKMeans km = DoubleKMeans.createKDTreeEnsemble(300); //how many clusters do u want.
+        DataSource<double[]> datasource = new DataSource<double[]>(allkeys);
+        DoubleKMeans.Result result = km.cluster(datasource);
 
         return result.defaultHardAssigner();
     }
