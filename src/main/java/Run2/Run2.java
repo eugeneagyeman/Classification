@@ -1,22 +1,17 @@
-import org.apache.commons.vfs2.FileObject;
-import org.apache.hadoop.ha.HealthCheckFailedException;
+package Run2;
+
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
 import org.openimaj.feature.DoubleFV;
-import org.openimaj.feature.DoubleFVComparison;
 import org.openimaj.image.DisplayUtilities;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
-import org.openimaj.ml.clustering.assignment.soft.DoubleKNNAssigner;
-import org.openimaj.util.array.ArrayUtils;
+import org.openimaj.ml.clustering.assignment.HardAssigner;
 
-import java.awt.image.SampleModel;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /** To do list:
  *  > create 8x8 patches, sample every 4 pixels in x,y direction
@@ -31,8 +26,9 @@ import java.util.Map;
  */
 public class Run2 {
 
-    final static int SAMPLE_SIZE = 100;
-    final static int SAMPLE_GAP = 30;
+    final static int SAMPLE_SIZE = 100; //100 for testing, recommended 8
+    final static int SAMPLE_GAP = 30; //30 for testing, recommended 4
+    final static int MAX_FEATURE_CAP = 10;
 
     public static void main(String[] args) throws IOException {
         Run2 testRun = new Run2();
@@ -68,18 +64,7 @@ public class Run2 {
             }
             DisplayUtilities.display(new FImage(img));
         }
-        */
-
-
-        /*
-        for(int i = 0 ; i < testPatches.size() ; i++){
-            FImage imgTest = new FImage((float[][]) testPatches.get(i));
-            DisplayUtilities.displayName(imgTest, "Patch"+i);
-            //DisplayUtilities.display(imgTest);
-            System.out.println("Patch " + i + " : " +testPatches.get(i));
-        }
-        */
-
+         */
 
 
     }
@@ -121,6 +106,13 @@ public class Run2 {
 
         }
 
+        System.out.println(allPatches.size());
+
+        if(allPatches.size() > MAX_FEATURE_CAP){
+            allPatches = new ArrayList<>(allPatches.subList(0,MAX_FEATURE_CAP));
+        }
+        System.out.println(allPatches.size());
+
         return allPatches;
 
     }
@@ -158,7 +150,14 @@ public class Run2 {
             }
         }
 
+        //caps features out to what ever max feature cap is
+        //basically first x features will be used -> rest of image is not included
         //System.out.println(allPatches.size());
+        if(allPatches.size() > MAX_FEATURE_CAP){
+            allPatches = new ArrayList<>(allPatches.subList(0,MAX_FEATURE_CAP));
+        }
+        //System.out.println(allPatches.size());
+
         return allPatches;
 
     }
@@ -206,7 +205,36 @@ public class Run2 {
     //Use if you want to create padded images when sampling
     //Implementation to account for padding not been made.
     public FImage paddedImage(FImage imgToBePadded){
-        return imgToBePadded.padding(SAMPLE_SIZE,SAMPLE_SIZE);
+        return imgToBePadded.padding(SAMPLE_SIZE,SAMPLE_SIZE,0f);
+    }
+
+
+
+    public static HardAssigner<double[], double[],float[]> trainQuantiser(VFSGroupDataset<FImage> trainingSet, Run2 r) {
+        List<List<double[]>> allkeys = new ArrayList<>();
+        //list that contains each image, and in each image contains all the features.
+
+        int imgCounter = 0;
+        for (FImage rec : trainingSet) {
+            FImage img = rec.getImage();
+
+            //image sampling occurs here, can swap different methods in e.g normalise or not
+            //r.patchMaker(img);
+
+            allkeys.add(r.patchMaker(img));
+            imgCounter++;
+        }
+
+        if (allkeys.size() > 10000)
+            allkeys = allkeys.subList(0, 10000);
+
+        //double kmeans -> use this
+
+        ByteKMeans km = ByteKMeans.createKDTreeEnsemble(300);
+        DataSource<byte[]> datasource = new LocalFeatureListDataSource<ByteDSIFTKeypoint, byte[]>(allkeys);
+        ByteCentroidsResult result = km.cluster(datasource);
+
+        return result.defaultHardAssigner();
     }
 
 
