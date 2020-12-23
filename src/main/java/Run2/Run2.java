@@ -33,7 +33,7 @@ public class Run2 {
 
     final static int SAMPLE_SIZE = 100; //100 for testing, recommended 8
     final static int SAMPLE_GAP = 30; //30 for testing, recommended 4
-    final static int MAX_FEATURE_CAP = 10;
+    final static int MAX_FEATURE_CAP = 10; //probs like 5000-10000 or something
 
     public static void main(String[] args) throws IOException {
         Run2 testRun = new Run2();
