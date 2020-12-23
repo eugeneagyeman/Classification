@@ -153,9 +153,11 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
         GroupedDataset<String, ListDataset<FImage>, FImage> trainingData = splits.getTrainingDataset();
         GroupedDataset<String, ListDataset<FImage>, FImage> testData = splits.getTestDataset();
 
-
         File cacheFeature = new File(workingDir.getAbsolutePath() + "/Cache");
-        IOUtils.writeToFile(trainHardAssigner(trainingData),cacheFeature);
+        if(!cacheFeature.exists()) { //make sure it does exist
+            IOUtils.writeToFile(trainHardAssigner(trainingData),cacheFeature);
+        }
+
         BoVWExtractor bovwe = new BoVWExtractor(IOUtils.readFromFile(cacheFeature));
         DiskCachingFeatureExtractor dCFE = new DiskCachingFeatureExtractor(cacheFeature,bovwe);
         LiblinearAnnotator<FImage, String> lla = new LiblinearAnnotator<>(dCFE,
