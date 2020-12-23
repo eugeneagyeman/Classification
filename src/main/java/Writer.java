@@ -28,14 +28,6 @@ public class Writer {
         }
     }
 
-    public Writer(String fn) {
-        path = fn;
-        try {
-            writer = new FileWriter(path);
-        } catch (IOException e) {
-        }
-    }
-
     public int reopenFile() {
         try {
             writer = new FileWriter(path);
