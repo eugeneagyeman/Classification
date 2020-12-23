@@ -59,12 +59,12 @@ public class Run3Classifier {
                 DisplayUtilities.display(entry.getKey(),entry.getValue());
             }*/
 
-            /*
+
             GroupedDataset<String, ListDataset<FImage>, FImage> data =
-                    GroupSampler.sample(images, 15, false);
+                    GroupSampler.sample(trainImages, 15, false);
 
             GroupedRandomSplitter<String, FImage> splits =
-                    new GroupedRandomSplitter<String, FImage>(data, 15, 0, 15);*/
+                    new GroupedRandomSplitter<String, FImage>(data, 50, 0, 50);
 
             //SIFTs
             DenseSIFT denseSIFT = new DenseSIFT(5, 7);
@@ -91,7 +91,6 @@ public class Run3Classifier {
                 cacheFile.createNewFile();
                 IOUtils.writeToFile(assigner, cacheFile);
             }
-
             FeatureExtractor<DoubleFV, FImage> extractor = new PHOWExtractor(pyramidDenseSIFT, assigner);
 
             //Exercise 2: Feature Caching
@@ -104,20 +103,25 @@ public class Run3Classifier {
                     1.0,
                     0.00001);*/
 
-            NaiveBayesAnnotator<FImage,String> svmann = new NaiveBayesAnnotator<FImage, String>(extractor, NaiveBayesAnnotator.Mode.ALL);
+            NaiveBayesAnnotator<FImage,String> naiveBayesAnnotator = new NaiveBayesAnnotator<FImage, String>(extractor, NaiveBayesAnnotator.Mode.MAXIMUM_LIKELIHOOD);
 
             timer.start();
-            svmann.train(trainImages);
+            naiveBayesAnnotator.train(trainImages);
             timer.stop();
-
             long resultantTime = timer.duration();
             System.out.println("Time: " + resultantTime);
 
-            ClassificationEvaluator<CMResult<String>, String, FImage> eval = new ClassificationEvaluator<>(svmann,testImages,new CMAnalyser<>(CMAnalyser.Strategy.SINGLE));
+            trainImages.forEach((c,fs) -> {
+                FImage img = fs.getRandomInstance();
+                System.out.println("Actual: "+ c +"\nExpected: "+ naiveBayesAnnotator.annotate(img));
+                System.out.println();
+            });
+
+            ClassificationEvaluator<CMResult<String>, String, FImage> eval = new ClassificationEvaluator<>(naiveBayesAnnotator,testImages,new CMAnalyser<>(CMAnalyser.Strategy.SINGLE));
 
             Map<FImage, ClassificationResult<String>> guesses = eval.evaluate();
             CMResult<String> result = eval.analyse(guesses);
-            result.getDetailReport();
+            System.out.println(result.getDetailReport());
             System.out.println("Classification Completed.");
         } catch (IOException e) {
             e.printStackTrace();
@@ -138,19 +142,7 @@ public class Run3Classifier {
         ByteCentroidsResult result = km.cluster(datasource);
         return result.defaultHardAssigner();
     }
-    class Record<FImage> {
-        private String imageClass;
-        private FImage image;
 
-        public Record(FImage image) {
-        }
-        FImage getImage() {
-            return image;
-        }
-        String getImageClass() {
-            return imageClass;
-        }
-    }
     static class PHOWExtractor implements FeatureExtractor<DoubleFV, FImage> {
         PyramidDenseSIFT<FImage> pdsift;
         HardAssigner<byte[], float[], IntFloatPair> assigner;
@@ -162,7 +154,6 @@ public class Run3Classifier {
         }
 
         public DoubleFV extractFeature(FImage fImage) {
-
             pdsift.analyseImage(fImage);
             BagOfVisualWords<byte[]> bovw = new BagOfVisualWords<>(assigner);
             BlockSpatialAggregator<byte[], SparseIntFV> spatial = new BlockSpatialAggregator<>(

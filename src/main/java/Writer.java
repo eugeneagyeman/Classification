@@ -28,6 +28,17 @@ public class Writer {
         }
     }
 
+    /**
+     * Initialise a Writer on a specific file path. Only reccomended to use for debugging.
+     * @param fn
+     */
+    public Writer(String fn) {
+        try {
+            writer = new FileWriter(fn);
+        } catch (IOException e) {
+        }
+    }
+
     public int reopenFile() {
         try {
             writer = new FileWriter(path);
