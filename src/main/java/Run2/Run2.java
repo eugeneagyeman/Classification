@@ -214,7 +214,7 @@ public class Run2 {
     }
 
 
-
+    /*
     public static HardAssigner<double[], double[], IntDoublePair> trainQuantiser(VFSGroupDataset<FImage> trainingSet, Run2 r) {
         List<List<double[]>> allkeys = new ArrayList<>();
         //list that contains each image, and in each image contains all the features.
@@ -238,7 +238,7 @@ public class Run2 {
         DoubleKMeans.Result result = km.cluster(datasource);
 
         return result.defaultHardAssigner();
-    }
+    }*/
 
 
 }

@@ -5,16 +5,14 @@ import org.openimaj.data.dataset.ListDataset;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.experiment.dataset.split.GroupedRandomSplitter;
 import org.openimaj.experiment.evaluation.classification.ClassificationResult;
-import org.openimaj.feature.DoubleFV;
-import org.openimaj.feature.FeatureExtractor;
-import org.openimaj.feature.FloatFV;
-import org.openimaj.feature.SparseIntFV;
+import org.openimaj.feature.*;
 import org.openimaj.image.DisplayUtilities;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.feature.local.aggregate.BagOfVisualWords;
 import org.openimaj.image.feature.local.aggregate.BlockSpatialAggregator;
 import org.openimaj.image.feature.local.keypoints.FloatKeypoint;
+import org.openimaj.io.IOUtils;
 import org.openimaj.ml.annotation.ScoredAnnotation;
 import org.openimaj.ml.annotation.linear.LiblinearAnnotator;
 import org.openimaj.ml.clustering.FloatCentroidsResult;
@@ -23,12 +21,19 @@ import org.openimaj.ml.clustering.kmeans.FloatKMeans;
 import org.openimaj.util.pair.IntFloatPair;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
 
     private static int MAX_DP_SIZ;
+
+    //used to read features from disk cache
+    public BoVWExtractor(HardAssigner<float[], float[], IntFloatPair> assigner){
+        this.ass = assigner;
+    }
+
 
     public static float[] getPatch(FImage img, int x, int y) {
         float[][] vs = img.pixels;
@@ -136,19 +141,32 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
         return keypoints;
     }
 
-    public static void main(String[] args) throws FileSystemException {
+    public static void main(String[] args) throws IOException {
         File workingDir = new File("../classification");
 
         VFSGroupDataset<FImage> dataset = new VFSGroupDataset<>("zip:" + workingDir.getAbsolutePath() + "/training.zip", ImageUtilities.FIMAGE_READER);
         GroupedRandomSplitter<String, FImage> splits = new GroupedRandomSplitter(dataset,
-                50,
+                5, //50 normally
                 0,
-                50);
+                5); //50 normally
 
         GroupedDataset<String, ListDataset<FImage>, FImage> trainingData = splits.getTrainingDataset();
         GroupedDataset<String, ListDataset<FImage>, FImage> testData = splits.getTestDataset();
 
 
+        File cacheFeature = new File(workingDir.getAbsolutePath() + "/Cache");
+        IOUtils.writeToFile(trainHardAssigner(trainingData),cacheFeature);
+        BoVWExtractor bovwe = new BoVWExtractor(IOUtils.readFromFile(cacheFeature));
+        DiskCachingFeatureExtractor dCFE = new DiskCachingFeatureExtractor(cacheFeature,bovwe);
+        LiblinearAnnotator<FImage, String> lla = new LiblinearAnnotator<>(dCFE,
+                LiblinearAnnotator.Mode.MULTICLASS,
+                SolverType.L2R_LR,
+                20,
+                25);
+
+
+        //uses bovw, not disk caching
+        /*
         BoVWExtractor bovwe = new BoVWExtractor();
         bovwe.ass = trainHardAssigner(trainingData);
 
@@ -157,6 +175,8 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
                 SolverType.L2R_LR,
                 20,
                 25);
+
+         */
 
         lla.train(trainingData);
 
