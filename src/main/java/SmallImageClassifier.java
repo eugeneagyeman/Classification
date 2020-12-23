@@ -1,26 +1,23 @@
-import org.apache.commons.vfs2.FileName;
 import org.apache.commons.vfs2.FileObject;
-import org.openimaj.data.dataset.GroupedDataset;
-import org.openimaj.data.dataset.ListDataset;
+import org.apache.commons.vfs2.FileSystemException;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
-import org.openimaj.experiment.dataset.split.GroupedRandomSplitter;
 import org.openimaj.feature.DoubleFV;
 import org.openimaj.feature.DoubleFVComparison;
 import org.openimaj.feature.FloatFV;
-import org.openimaj.image.DisplayUtilities;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.processing.resize.ResizeProcessor;
 import org.openimaj.ml.clustering.assignment.soft.DoubleKNNAssigner;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.*;
 
 /**
- * OK so next challenge is to use the KNNClassifier classes - feed data and read from indices
- * Work out the ouput - NOT ACCURATE (maybe use another classifier to work it out?)
+ * Uses KNN to classify images using a feature vector formed by cropping a small square out of the centre of the image.
+ * The square is resized to fixed 16x16 pixels and will start at one eighth of the image size.
+ *
+ * Written by Emily James, Dec 2020
  */
 public class SmallImageClassifier {
 
@@ -92,6 +89,68 @@ public class SmallImageClassifier {
         return fv.normaliseFV();
     }
 
+    /**
+     * Runs the program from scratch - first training the data using a file called "training.zip"
+     * and then generating a list of classes from images in "testing.zip", finally generating its
+     * results in "run1.txt". All the files are in the base working directory.
+     * @throws FileSystemException
+     */
+    public void trainAndTest() throws FileSystemException {
+        String workingDir = new File("../classification").getAbsolutePath();
+        Map<double[], String> classesPairs = new HashMap<>();
+
+
+        List<double[]> featureSpace = getTrainingVectors(classesPairs, workingDir);
+
+        double[][] fixedFeatureSpace = featureSpace.toArray(new double[featureSpace.size()][CROP_SIZE_PX*CROP_SIZE_PX]);
+        final int K = (int) Math.sqrt(featureSpace.size());
+        DoubleKNNAssigner nn = new DoubleKNNAssigner(fixedFeatureSpace, DoubleFVComparison.EUCLIDEAN, K);
+
+        Map<String, String> results = classifyTestData(nn, fixedFeatureSpace, classesPairs, workingDir);
+        writeResults(results);
+    }
+
+    private List<double[]> getTrainingVectors(Map<double[], String> classesPairs, String workingDir) throws FileSystemException {
+        VFSGroupDataset<FImage> trainingData = new VFSGroupDataset<>("zip:" + workingDir + "/training.zip", ImageUtilities.FIMAGE_READER);
+        List<double[]> featureSpace = new ArrayList<>();
+
+        trainingData.forEach((s, fs) -> {
+            System.out.println(s);
+            fs.forEach(f -> {
+                double[] fv = centredNormalisedFV(f);
+                featureSpace.add(fv);
+                classesPairs.put(fv, s);
+            });
+        });
+        return featureSpace;
+    }
+
+    private Map<String, String> classifyTestData(DoubleKNNAssigner assigner, double[][] fixedFeatureSpace, Map<double[], String> classesPairs, String workingDir) throws FileSystemException {
+        VFSGroupDataset<FImage> testData = new VFSGroupDataset<>("zip:" + workingDir + "/testing.zip", ImageUtilities.FIMAGE_READER);
+        Map<String, String> results = new TreeMap<>();
+        testData.forEach((s,fs) -> {
+            for (int i = 0; i < fs.numInstances(); i++) {
+                FImage f = fs.getInstance(i);
+                FileObject fo = fs.getFileObject(i);
+
+                double[] fv = centredNormalisedFV(f);
+                int[] r = assigner.assign(fv);
+                String classifier = findMajority(r, fixedFeatureSpace, classesPairs);
+                classesPairs.put(fv, classifier);
+                results.put(fo.getName().getBaseName(), classifier);
+//                w.writeResult(fo, classifier);
+//                w.flush();
+            }
+        });
+        return results;
+    }
+
+    private void writeResults(Map<String, String> results) {
+        Writer w = new Writer(1);
+        w.writeResults(results);
+        w.closeFile();
+    }
+
     private static String findMajority(int[] neighbours, double[][] dataset,  Map<double[], String> classes) {
         Map<String, Integer> occur = new HashMap<>();
         for (int neighbourI : neighbours) {
@@ -110,70 +169,6 @@ public class SmallImageClassifier {
         });
 
         return maxClass[0];
-    }
-
-    public static void main(String[] args) throws IOException {
-        File workingDir = new File("../classification");
-        VFSGroupDataset<FImage> train = new VFSGroupDataset<>("zip:" + workingDir.getAbsolutePath() + "/training.zip", ImageUtilities.FIMAGE_READER);
-        int splitSize = 75; // ideal as each group has 100 images --> 50 each
-        System.out.println("splitSize = " + splitSize);
-
-        VFSListDataset<FImage> test = new VFSListDataset<>("zip:" + workingDir.getAbsolutePath() + "/testing.zip", ImageUtilities.FIMAGE_READER);
-        VFSGroupDataset<FImage> tests = new VFSGroupDataset<>("zip:" + workingDir.getAbsolutePath() + "/testing.zip", ImageUtilities.FIMAGE_READER);
-
-
-        Map<double[], String> classesPairs = new HashMap<>();
-
-        List<double[]> featureSpace = new ArrayList<>();
-
-        train.forEach((s, fs) -> {
-            System.out.println(s);
-            fs.forEach(f -> {
-                double[] fv = centredNormalisedFV(f);
-                featureSpace.add(fv);
-                classesPairs.put(fv, s);
-            });
-        });
-
-        System.out.println("featureSpace.size() = " + featureSpace.size());
-        final int K = (int) Math.sqrt(featureSpace.size());
-        double[][] ds = featureSpace.toArray(new double[featureSpace.size()][CROP_SIZE_PX*CROP_SIZE_PX]);
-
-        DoubleKNNAssigner nn = new DoubleKNNAssigner(ds, DoubleFVComparison.EUCLIDEAN, K);
-
-        final double[] correct = {0};
-        final double[] incorrect = {0};
-
-//        test.forEach(f -> {
-//            double[] fv = centredNormalisedFV(f);
-//                int[] r = nn.assign(fv);
-//                String classifier = findMajority(r, ds, classesPairs);
-//                classesPairs.put(fv, classifier);
-//        });
-
-        Writer w = new Writer("run1.txt");
-        tests.forEach((s,fs) -> {
-            for (int i = 0; i < fs.numInstances(); i++) {
-                FImage f = fs.getInstance(i);
-                FileObject fo = fs.getFileObject(i);
-
-                double[] fv = centredNormalisedFV(f);
-                int[] r = nn.assign(fv);
-                String classifier = findMajority(r, ds, classesPairs);
-                classesPairs.put(fv, classifier);
-
-                String name = fo.getName().getBaseName();
-                w.write(name +" "+classifier+"\n");
-                w.flush();
-            }
-        });
-        w.closeFile();
-
-        /*System.out.println("REPORT:\n" +
-                "Correct: " + correct[0] + "\n" +
-                "Incorrect: " + incorrect[0] + "\n" +
-                "Accuracy: " + (100 * correct[0] / (correct[0] + incorrect[0])) + "%");
-        System.out.println("CROP_FACTOR = " + BOX_SIZE_FACTOR);*/
     }
 
     private static void printListWithIndexes(int[] assignment) {
