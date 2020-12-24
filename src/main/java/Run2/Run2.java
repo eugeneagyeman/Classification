@@ -2,8 +2,11 @@ package Run2;
 
 import org.openimaj.data.DataSource;
 import org.openimaj.data.DoubleArrayBackedDataSource;
+import org.openimaj.data.dataset.GroupedDataset;
+import org.openimaj.data.dataset.ListDataset;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
+import org.openimaj.experiment.dataset.split.GroupedRandomSplitter;
 import org.openimaj.feature.DoubleFV;
 import org.openimaj.image.DisplayUtilities;
 import org.openimaj.image.FImage;
@@ -38,16 +41,18 @@ public class Run2 {
     public static void main(String[] args) throws IOException {
         Run2 testRun = new Run2();
         File workingDir = new File("../classification");
-        VFSGroupDataset<FImage> train = new VFSGroupDataset<>("zip:" + workingDir.getAbsolutePath() + "/training.zip", ImageUtilities.FIMAGE_READER);
-        int splitSize = 75; // ideal as each group has 100 images --> 50 each
-        System.out.println("splitSize = " + splitSize);
 
-        VFSListDataset<FImage> test = new VFSListDataset<>("zip:" + workingDir.getAbsolutePath() + "/testing.zip", ImageUtilities.FIMAGE_READER);
-        VFSGroupDataset<FImage> tests = new VFSGroupDataset<>("zip:" + workingDir.getAbsolutePath() + "/testing.zip", ImageUtilities.FIMAGE_READER);
+        VFSGroupDataset<FImage> dataset = new VFSGroupDataset<>("zip:" + workingDir.getAbsolutePath() + "/training.zip", ImageUtilities.FIMAGE_READER);
+        GroupedRandomSplitter<String, FImage> splits = new GroupedRandomSplitter(dataset,
+                5, //50 normally
+                0,
+                5); //50 normally
 
+        GroupedDataset<String, ListDataset<FImage>, FImage> trainingData = splits.getTrainingDataset();
+        GroupedDataset<String, ListDataset<FImage>, FImage> testData = splits.getTestDataset();
 
         //testing 1d array thingy
-        ArrayList<double[]> testing1dArray = testRun.patchMaker(train.get("bedroom").get(0));
+        List<double[]> testing1dArray = testRun.patchMaker(trainingData.get("bedroom").get(0));
         if (testing1dArray.get(0).equals(testing1dArray.get(1))){
             System.out.println("the same");
         }else{
@@ -77,7 +82,7 @@ public class Run2 {
 
 
     //returns an arraylist of pixel patches for the image parsed in
-    public ArrayList<double[][]> patchMakerTest(FImage img) {
+    public List<double[][]> patchMakerTest(FImage img) {
         //size of image
         int imgRows = img.getRows();
         int imgCols = img.getCols();
@@ -124,7 +129,7 @@ public class Run2 {
 
 
     //returns an arraylist of pixel patches for the image parsed in
-    public ArrayList<double[]> patchMaker(FImage img) {
+    public List<double[]> patchMaker(FImage img) {
         //size of image
         int imgRows = img.getRows();
         int imgCols = img.getCols();
@@ -161,7 +166,14 @@ public class Run2 {
         if(allPatches.size() > MAX_FEATURE_CAP){
             allPatches = new ArrayList<>(allPatches.subList(0,MAX_FEATURE_CAP));
         }
+
         //System.out.println(allPatches.size());
+
+        /*
+        for (int i = 0; i <  MAX_FEATURE_CAP; i++) {
+            System.out.println(allPatches.get(i));
+        }
+         */
 
         return allPatches;
 
@@ -212,33 +224,6 @@ public class Run2 {
     public FImage paddedImage(FImage imgToBePadded){
         return imgToBePadded.padding(SAMPLE_SIZE,SAMPLE_SIZE,0f);
     }
-
-
-    /*
-    public static HardAssigner<double[], double[], IntDoublePair> trainQuantiser(VFSGroupDataset<FImage> trainingSet, Run2 r) {
-        List<List<double[]>> allkeys = new ArrayList<>();
-        //list that contains each image, and in each image contains all the features.
-
-        int imgCounter = 0;
-        for (FImage rec : trainingSet) {
-            FImage img = rec.getImage();
-
-
-            //image sampling occurs here, can swap different methods in e.g normalise or not
-            //r.patchMaker(img);
-
-            allkeys.add(r.patchMaker(img));
-            imgCounter++;
-        }
-
-
-        //double kmeans -> use this probs
-        DoubleKMeans km = DoubleKMeans.createKDTreeEnsemble(300); //how many clusters do u want.
-        DataSource<double[]> datasource = new DataSource<double[]>(allkeys);
-        DoubleKMeans.Result result = km.cluster(datasource);
-
-        return result.defaultHardAssigner();
-    }*/
 
 
 }
