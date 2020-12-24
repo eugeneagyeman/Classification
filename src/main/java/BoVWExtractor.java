@@ -4,7 +4,10 @@ import org.openimaj.data.dataset.GroupedDataset;
 import org.openimaj.data.dataset.ListDataset;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.experiment.dataset.split.GroupedRandomSplitter;
+import org.openimaj.experiment.evaluation.classification.ClassificationEvaluator;
 import org.openimaj.experiment.evaluation.classification.ClassificationResult;
+import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMAnalyser;
+import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMResult;
 import org.openimaj.feature.DoubleFV;
 import org.openimaj.feature.FeatureExtractor;
 import org.openimaj.feature.FloatFV;
@@ -25,6 +28,7 @@ import org.openimaj.util.pair.IntFloatPair;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
 
@@ -136,29 +140,55 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
         return keypoints;
     }
 
-    public static void main(String[] args) throws FileSystemException {
+    /*public static void main(String[] args) throws FileSystemException {
         File workingDir = new File("../classification");
-
+        int nTrain = 50;
         VFSGroupDataset<FImage> dataset = new VFSGroupDataset<>("zip:" + workingDir.getAbsolutePath() + "/training.zip", ImageUtilities.FIMAGE_READER);
         GroupedRandomSplitter<String, FImage> splits = new GroupedRandomSplitter(dataset,
-                50,
+                nTrain,
                 0,
-                50);
+                nTrain);
 
         GroupedDataset<String, ListDataset<FImage>, FImage> trainingData = splits.getTrainingDataset();
         GroupedDataset<String, ListDataset<FImage>, FImage> testData = splits.getTestDataset();
 
+        DisplayUtilities.display("training", dataset.get("training"));
+    }*/
+
+    public static void main(String[] args) throws FileSystemException {
+        File workingDir = new File("../classification");
+
+        int nTrain = 50;
+        VFSGroupDataset<FImage> dataset = new VFSGroupDataset<>("zip:" + workingDir.getAbsolutePath() + "/training.zip", ImageUtilities.FIMAGE_READER);
+        dataset.remove("training");
+        GroupedRandomSplitter<String, FImage> splits = new GroupedRandomSplitter(dataset,
+                nTrain,
+                0,
+                nTrain);
+
+        GroupedDataset<String, ListDataset<FImage>, FImage> trainingData = splits.getTrainingDataset();
+        GroupedDataset<String, ListDataset<FImage>, FImage> testData = splits.getTestDataset();
+
+        long time = System.nanoTime();
 
         BoVWExtractor bovwe = new BoVWExtractor();
         bovwe.ass = trainHardAssigner(trainingData);
 
+        // -vars-with 50-50----|results l2rl2loss|--results mcsvmcs--|--results l2r--|
+        // c = 1, eps at 1e-4 -> 22%, 22%, 22%   | 48%, 47%, 46%     |  17%, 16%, ..
+        // c = 10, eps at 1e-4 -> 33%, 32%, 35%  |                   |
+        // c = 15, eps at 1e-4 -> 35%, 38%, 36%  |                   |
+        // c = 20, eps at 1e-4 -> 36%, 37% ...   | 44%, 49%, 46%     |
+        // c = 25, eps at 1e-4 ->      ...       |                   |
         LiblinearAnnotator<FImage, String> lla = new LiblinearAnnotator<>(bovwe,
                 LiblinearAnnotator.Mode.MULTICLASS,
-                SolverType.L2R_LR,
-                20,
-                25);
+                SolverType.MCSVM_CS,
+                15,
+                .00001);
 
         lla.train(trainingData);
+
+        System.out.println(lla.getAnnotations());
 
 //        trainingData.forEach( (c, fs) -> {
 //            System.out.println(c+" "+fs.size());
@@ -173,13 +203,42 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
 //        DisplayUtilities.display(i);
 //        System.out.println(lla.annotate(i));
 
-        trainingData.forEach( (c, fs) -> {
-//            fs.forEach( f -> {
-            FImage f = fs.getRandomInstance();
+        final int[] corr = {0};
+        final int[] incorr = {0};
+        testData.forEach( (c, fs) -> {
+            fs.forEach( f -> {
+//            FImage f = fs.getRandomInstance();
 //            DisplayUtilities.display(f);
-            System.out.println(c + " -" + lla.annotate(f));
-//            });
+                List<ScoredAnnotation<String>> annotations = lla.annotate(f);
+//                System.out.println(c + " -> " + annotations);
+                if (c.equals(annotations.iterator().next().annotation))
+                    corr[0]++;
+                else
+                    incorr[0]++;
+            });
         });
+
+        double correct = corr[0];
+        double incorrect = incorr[0];
+
+        System.out.println("REPORT:\n" +
+                "Correct: "+correct+"\n" +
+                "Incorrect: "+incorrect+"\n" +
+                "Accuracy: "+100*(correct/(correct+incorrect)));
+
+        ClassificationEvaluator<CMResult<String>, String, FImage> eval =
+                new ClassificationEvaluator<>(
+                        lla, splits.getTestDataset(), new CMAnalyser<>(CMAnalyser.Strategy.SINGLE));
+
+        Map<FImage, ClassificationResult<String>> guesses = eval.evaluate();
+        CMResult<String> result = eval.analyse(guesses);
+
+        // print results to sdtout
+        System.out.println(result.getDetailReport());
+
+        time -= System.nanoTime(); // calc diff
+        time *= .0000000001; // convert to seconds
+        System.out.println("Completed in "+time+" seconds.");
 
     }
 
