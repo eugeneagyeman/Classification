@@ -1,3 +1,5 @@
+package Run2;
+
 import de.bwaldvogel.liblinear.SolverType;
 import org.apache.commons.vfs2.FileSystemException;
 import org.openimaj.data.dataset.GroupedDataset;
@@ -8,16 +10,14 @@ import org.openimaj.experiment.evaluation.classification.ClassificationEvaluator
 import org.openimaj.experiment.evaluation.classification.ClassificationResult;
 import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMAnalyser;
 import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMResult;
-import org.openimaj.feature.DoubleFV;
-import org.openimaj.feature.FeatureExtractor;
-import org.openimaj.feature.FloatFV;
-import org.openimaj.feature.SparseIntFV;
+import org.openimaj.feature.*;
 import org.openimaj.image.DisplayUtilities;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.feature.local.aggregate.BagOfVisualWords;
 import org.openimaj.image.feature.local.aggregate.BlockSpatialAggregator;
 import org.openimaj.image.feature.local.keypoints.FloatKeypoint;
+import org.openimaj.io.IOUtils;
 import org.openimaj.ml.annotation.ScoredAnnotation;
 import org.openimaj.ml.annotation.linear.LiblinearAnnotator;
 import org.openimaj.ml.clustering.FloatCentroidsResult;
@@ -26,21 +26,43 @@ import org.openimaj.ml.clustering.kmeans.FloatKMeans;
 import org.openimaj.util.pair.IntFloatPair;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
 
-    private static int MAX_DP_SIZ;
+    /*
+    private static int MAX_DP_SIZ; //10000 for testing
+    private static int SAMPLE_SIZE; //100 for testing, recommended 8
+    private static int SAMPLE_GAP; //30 for testing, recommended 4
+    private static int CODEBOOK_SIZE; //500 recommended
+    */
+
+
+    final static int MAX_DP_SIZ = 10000; //probs like 5000-10000 or something
+    final static int SAMPLE_SIZE = 8; //100 for testing, recommended 8
+    final static int SAMPLE_GAP = 4; //30 for testing, recommended 4
+    final static int CODEBOOK_SIZE = 500;
+
+
+    /*
+    public BoVWExtractor(int maxFeatureCap, int sampleSize, int sampleGap,int codebookSize){
+        this.MAX_DP_SIZ = maxFeatureCap;
+        this.SAMPLE_SIZE = sampleSize;
+        this.SAMPLE_GAP = sampleGap;
+        this.CODEBOOK_SIZE = codebookSize;
+    }*/
+
 
     public static float[] getPatch(FImage img, int x, int y) {
         float[][] vs = img.pixels;
-        float[] patch = new float[64];
+        float[] patch = new float[SAMPLE_SIZE*SAMPLE_SIZE];
         int ppoint = 0;
 
-        for (int i = x; i < x+8; i++) {
-            for (int j = y; j < y+8; j++) {
+        for (int i = x; i < x+SAMPLE_GAP; i++) {
+            for (int j = y; j < y+SAMPLE_GAP; j++) {
                 float v = 0;
                 try {
                     v = vs[x+i][y+j];
@@ -56,11 +78,11 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
 
     public static FloatFV getPatchFV(FImage img, int x, int y) {
         float[][] vs = img.pixels;
-        float[] patch = new float[64];
+        float[] patch = new float[SAMPLE_SIZE*SAMPLE_SIZE];
         int ppoint = 0;
 
-        for (int i = x; i < x+8; i++) {
-            for (int j = y; j < y+8; j++) {
+        for (int i = x; i < x+SAMPLE_GAP; i++) {
+            for (int j = y; j < y+SAMPLE_GAP; j++) {
                 float v = 0;
                 try {
                     v = vs[x+i][y+j];
@@ -84,15 +106,15 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
 
         getFVArrs(imgs, dps);
 
-        MAX_DP_SIZ = 10000;
+        //MAX_DP_SIZ = 10000;
         if (dps.size() > MAX_DP_SIZ)
             datapoints = dps.subList(0, MAX_DP_SIZ);
         else
             datapoints = dps;
 
-        float[][] fvs = datapoints.toArray(new float[datapoints.size()][64]);
+        float[][] fvs = datapoints.toArray(new float[datapoints.size()][SAMPLE_SIZE*SAMPLE_SIZE]);
 //        DataSource<float[]> ds = new LocalFeatureListDataSource<>(dps);
-        FloatKMeans km = FloatKMeans.createKDTreeEnsemble(500);
+        FloatKMeans km = FloatKMeans.createKDTreeEnsemble(CODEBOOK_SIZE);
         FloatKMeans.Result r = km.cluster(fvs);
 
         return r.defaultHardAssigner();
@@ -102,13 +124,13 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
     // you could just checkout my branch
     // one sec
 
-    private static void getFVArrs(GroupedDataset<String, ListDataset<FImage>, FImage> imgs, List<float[]> dps) {
+    public static void getFVArrs(GroupedDataset<String, ListDataset<FImage>, FImage> imgs, List<float[]> dps) {
         imgs.forEach( (c, fs) -> {
             fs.forEach( f -> {
 //            FImage f = fs.getRandomInstance();
                 float[][] pxls = f.pixels;
-                for (int x = 0; x < pxls.length; x+=4) {
-                    for (int y = 0; y < pxls.length; y+=4) {
+                for (int x = 0; x < pxls.length; x+=SAMPLE_GAP) {
+                    for (int y = 0; y < pxls.length; y+=SAMPLE_GAP) {
                         float[] fv = getPatch(f, x, y);
                         dps.add(getPatch(f, x, y));
                     }
@@ -117,7 +139,7 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
         });
     }
 
-    private static void getFVKPS(GroupedDataset<String, ListDataset<FImage>, FImage> imgs, List<FloatKeypoint> dps) {
+    public static void getFVKPS(GroupedDataset<String, ListDataset<FImage>, FImage> imgs, List<FloatKeypoint> dps) {
         imgs.forEach( (c, fs) -> {
             fs.forEach( f -> {
 //            FImage f = fs.getRandomInstance();
@@ -127,11 +149,11 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
         });
     }
 
-    private static List<FloatKeypoint> getFloatKeypoints(FImage f) {
+    public static List<FloatKeypoint> getFloatKeypoints(FImage f) {
         float[][] pxls = f.pixels;
         List<FloatKeypoint> keypoints = new ArrayList<>();
-        for (int x = 0; x < pxls.length; x+=4) {
-            for (int y = 0; y < pxls.length; y+=4) {
+        for (int x = 0; x < pxls.length; x+=SAMPLE_GAP) {
+            for (int y = 0; y < pxls.length; y+=SAMPLE_GAP) {
                 float[] fv = getPatch(f, x, y);
                 FloatKeypoint keyPoint = getKeyPoint(x, y, 0, 1, getPatch(f, x, y));
                 keypoints.add(keyPoint);
@@ -155,10 +177,11 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
         DisplayUtilities.display("training", dataset.get("training"));
     }*/
 
-    public static void main(String[] args) throws FileSystemException {
+
+    public static void main(String[] args) throws IOException {
         File workingDir = new File("../classification");
 
-        int nTrain = 50;
+        int nTrain = 8; //50
         VFSGroupDataset<FImage> dataset = new VFSGroupDataset<>("zip:" + workingDir.getAbsolutePath() + "/training.zip", ImageUtilities.FIMAGE_READER);
         dataset.remove("training");
         GroupedRandomSplitter<String, FImage> splits = new GroupedRandomSplitter(dataset,
@@ -171,8 +194,23 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
 
         long time = System.nanoTime();
 
+        //BoVWExtractor bovwe = new BoVWExtractor(MAX_DP_SIZ, SAMPLE_SIZE, SAMPLE_GAP, CODEBOOK_SIZE);
         BoVWExtractor bovwe = new BoVWExtractor();
         bovwe.ass = trainHardAssigner(trainingData);
+
+        //File cacheFeature = new File(workingDir.getAbsolutePath() + "/Cache");
+
+        //if(!cacheFeature.exists()) { //make sure it does exist
+        //    IOUtils.writeToFile(trainHardAssigner(trainingData),cacheFeature);
+        //}
+
+        //bovwe.ass = IOUtils.readFromFile(cacheFeature);
+        //FeatureExtractor<DoubleFV,FImage> dCFE = new DiskCachingFeatureExtractor(cacheFeature,bovwe);
+        //LiblinearAnnotator<FImage, String> lla = new LiblinearAnnotator<>(dCFE,
+        //        LiblinearAnnotator.Mode.MULTICLASS,
+        //        SolverType.MCSVM_CS,
+        //        15,
+        //        .00001);
 
         // -vars-with 50-50----|results l2rl2loss|--results mcsvmcs--|--results l2r--|
         // c = 1, eps at 1e-4 -> 22%, 22%, 22%   | 48%, 47%, 46%     |  17%, 16%, ..
@@ -180,11 +218,14 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
         // c = 15, eps at 1e-4 -> 35%, 38%, 36%  |                   |
         // c = 20, eps at 1e-4 -> 36%, 37% ...   | 44%, 49%, 46%     |
         // c = 25, eps at 1e-4 ->      ...       |                   |
-        LiblinearAnnotator<FImage, String> lla = new LiblinearAnnotator<>(bovwe,
+
+
+       LiblinearAnnotator<FImage, String> lla = new LiblinearAnnotator<>(bovwe,
                 LiblinearAnnotator.Mode.MULTICLASS,
-                SolverType.MCSVM_CS,
+                SolverType.MCSVM_CS, //MCSVM_CS
                 15,
                 .00001);
+
 
         lla.train(trainingData);
 
@@ -240,7 +281,10 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
         time *= .0000000001; // convert to seconds
         System.out.println("Completed in "+time+" seconds.");
 
+
+
     }
+
 
     private static void printList(List<ScoredAnnotation<String>> list) {
         if (list == null)

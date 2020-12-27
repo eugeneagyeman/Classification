@@ -1,5 +1,6 @@
 package Run2;
 
+import de.bwaldvogel.liblinear.SolverType;
 import org.openimaj.data.DataSource;
 import org.openimaj.data.DoubleArrayBackedDataSource;
 import org.openimaj.data.dataset.GroupedDataset;
@@ -7,10 +8,18 @@ import org.openimaj.data.dataset.ListDataset;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
 import org.openimaj.experiment.dataset.split.GroupedRandomSplitter;
+import org.openimaj.experiment.evaluation.classification.ClassificationEvaluator;
+import org.openimaj.experiment.evaluation.classification.ClassificationResult;
+import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMAnalyser;
+import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMResult;
+import org.openimaj.feature.BagOfWordsFeatureExtractor;
 import org.openimaj.feature.DoubleFV;
+import org.openimaj.feature.FeatureExtractor;
 import org.openimaj.image.DisplayUtilities;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
+import org.openimaj.ml.annotation.ScoredAnnotation;
+import org.openimaj.ml.annotation.linear.LiblinearAnnotator;
 import org.openimaj.ml.clustering.assignment.HardAssigner;
 import org.openimaj.ml.clustering.kmeans.DoubleKMeans;
 import org.openimaj.util.pair.IntDoublePair;
@@ -20,6 +29,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 /** To do list:
  *  > create 8x8 patches, sample every 4 pixels in x,y direction
@@ -36,7 +46,8 @@ public class Run2 {
 
     final static int SAMPLE_SIZE = 100; //100 for testing, recommended 8
     final static int SAMPLE_GAP = 30; //30 for testing, recommended 4
-    final static int MAX_FEATURE_CAP = 10; //probs like 5000-10000 or something
+    final static int MAX_FEATURE_CAP = 10000; //probs like 5000-10000 or something
+    final static int CODEBOOK_SIZE = 500;
 
     public static void main(String[] args) throws IOException {
         Run2 testRun = new Run2();
@@ -51,13 +62,16 @@ public class Run2 {
         GroupedDataset<String, ListDataset<FImage>, FImage> trainingData = splits.getTrainingDataset();
         GroupedDataset<String, ListDataset<FImage>, FImage> testData = splits.getTestDataset();
 
+        long time = System.nanoTime();
+
         //testing 1d array thingy
+        /*
         List<double[]> testing1dArray = testRun.patchMaker(trainingData.get("bedroom").get(0));
         if (testing1dArray.get(0).equals(testing1dArray.get(1))){
             System.out.println("the same");
         }else{
             System.out.println("not the same");
-        }
+        }*/
 
 
         //testing picture sampling to see if it works
@@ -75,6 +89,55 @@ public class Run2 {
             DisplayUtilities.display(new FImage(img));
         }
          */
+
+        BoVWExtractor bovwe = new BoVWExtractor();
+        bovwe.ass = bovwe.trainHardAssigner(trainingData);
+        LiblinearAnnotator<FImage, String> lla = new LiblinearAnnotator<>(bovwe,
+                LiblinearAnnotator.Mode.MULTICLASS,
+                SolverType.MCSVM_CS,
+                15,
+                .00001);
+
+        lla.train(trainingData);
+
+        System.out.println(lla.getAnnotations());
+
+        final int[] corr = {0};
+        final int[] incorr = {0};
+        testData.forEach( (c, fs) -> {
+            fs.forEach( f -> {
+//            FImage f = fs.getRandomInstance();
+//            DisplayUtilities.display(f);
+                List<ScoredAnnotation<String>> annotations = lla.annotate(f);
+//                System.out.println(c + " -> " + annotations);
+                if (c.equals(annotations.iterator().next().annotation))
+                    corr[0]++;
+                else
+                    incorr[0]++;
+            });
+        });
+
+        double correct = corr[0];
+        double incorrect = incorr[0];
+
+        System.out.println("REPORT:\n" +
+                "Correct: "+correct+"\n" +
+                "Incorrect: "+incorrect+"\n" +
+                "Accuracy: "+100*(correct/(correct+incorrect)));
+
+        ClassificationEvaluator<CMResult<String>, String, FImage> eval =
+                new ClassificationEvaluator<>(
+                        lla, splits.getTestDataset(), new CMAnalyser<>(CMAnalyser.Strategy.SINGLE));
+
+        Map<FImage, ClassificationResult<String>> guesses = eval.evaluate();
+        CMResult<String> result = eval.analyse(guesses);
+
+        // print results to sdtout
+        System.out.println(result.getDetailReport());
+
+        time -= System.nanoTime(); // calc diff
+        time *= .0000000001; // convert to seconds
+        System.out.println("Completed in "+time+" seconds.");
 
 
     }
