@@ -69,19 +69,23 @@ public class Run3Classifier {
     static  {
 
 
+        String dir = new File("../classification").getAbsolutePath();
         System.out.println("Running Classifier...");
         try {
+            //Record Implementation
+            //Unzip training and testing files
+            //For each folder in training
+            //create new list backdataset
+            //convert images into identifiable records
 
             VFSGroupDataset<FImage> trainImages =
-                    new VFSGroupDataset<>("/Users/deniz/Desktop/Uni/Third Year/Semester 1/COMP3204 Computer Vision/Coursework3/datasets/training", ImageUtilities.FIMAGE_READER);
+                    new VFSGroupDataset<>("zip:" + dir + "/training.zip", ImageUtilities.FIMAGE_READER);
 
+            VFSListDataset<FImage> testImages = new VFSListDataset<FImage>("zip:" + dir + "/testing.zip", ImageUtilities.FIMAGE_READER);
 
-            VFSListDataset<FImage> testImages = new VFSListDataset<FImage>("/Users/deniz/Desktop/Uni/Third Year/Semester 1/COMP3204 Computer Vision/Coursework3/datasets/testing/",ImageUtilities.FIMAGE_READER);
+            GroupedDataset<String, ListDataset<FImage>, FImage> data = GroupSampler.sample(trainImages, 15, false);
 
-            GroupedDataset<String, ListDataset<FImage>, FImage> data =  GroupSampler.sample(trainImages, 15, false);
-
-
-            GroupedRandomSplitter<String, FImage> splits = new GroupedRandomSplitter<String, FImage>(data,TRAININGSIZE,VALIDATIONSIZE,TESTINGSIZE);
+            GroupedRandomSplitter<String, FImage> splits = new GroupedRandomSplitter<String, FImage>(data, TRAININGSIZE, VALIDATIONSIZE, TESTINGSIZE);
             GroupedDataset<String, ListDataset<FImage>, FImage> subTrainingSet = splits.getTrainingDataset();
             GroupedDataset<String, ListDataset<FImage>, FImage> subTestSet = splits.getTestDataset();
 
@@ -109,12 +113,12 @@ public class Run3Classifier {
             long resultantTime = timer.duration();
             System.out.println("Time for Naive Bayes: " + resultantTime / 1000 / 60 + " minutes");
 
-            //SVM
-            timer.start();
-            linearSVMAnnotator.train(subTrainingSet);
-            timer.stop();
-            long resultantTime2 = timer.duration();
-            System.out.println("Time for Linear SVM: " + resultantTime2 / 1000 / 60 + " minutes");
+//            //SVM
+//            timer.start();
+//            linearSVMAnnotator.train(subTrainingSet);
+//            timer.stop();
+//            long resultantTime2 = timer.duration();
+//            System.out.println("Time for Linear SVM: " + resultantTime2 / 1000 / 60 + " minutes");
 
             //LibLinear
             timer.start();
