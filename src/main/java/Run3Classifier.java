@@ -34,6 +34,7 @@ import org.openimaj.ml.clustering.kmeans.ByteKMeans;
 import org.openimaj.ml.kernel.HomogeneousKernelMap;
 import org.openimaj.time.Timer;
 import org.openimaj.util.pair.IntFloatPair;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -43,9 +44,6 @@ import java.util.Set;
 
 public class Run3Classifier {
 
-    //TODO: Edit this to remove or possibly implement
-    private static final String CACHE_PATH = "src/main/java/cache";
-    private static final Timer timer = new Timer();
     final static int CLUSTERS = 300;
     final static int STEPS = 5;
     final static int BIN = 7;
@@ -57,23 +55,29 @@ public class Run3Classifier {
     final static int SAMPLE = 30;
 
 
-    //TODO:
-    static  {
+    //TODO: Edit this to remove or possibly implement
+    private static final String CACHE_PATH = "src/main/java/cache";
+    private static final Timer timer = new Timer();
 
+    static {
 
+        String dir = new File("../classification").getAbsolutePath();
         System.out.println("Running Classifier...");
         try {
+            //Record Implementation
+            //Unzip training and testing files
+            //For each folder in training
+                //create new list backdataset
+                //convert images into identifiable records
 
             VFSGroupDataset<FImage> trainImages =
-                    new VFSGroupDataset<>("/Users/deniz/Desktop/Uni/Third Year/Semester 1/COMP3204 Computer Vision/Coursework3/datasets/training", ImageUtilities.FIMAGE_READER);
+                    new VFSGroupDataset<>("zip:" + dir + "/training.zip", ImageUtilities.FIMAGE_READER);
 
+            VFSListDataset<FImage> testImages = new VFSListDataset<FImage>("zip:" + dir + "/testing.zip", ImageUtilities.FIMAGE_READER);
 
-            VFSListDataset<FImage> testImages = new VFSListDataset<FImage>("/Users/deniz/Desktop/Uni/Third Year/Semester 1/COMP3204 Computer Vision/Coursework3/datasets/testing/",ImageUtilities.FIMAGE_READER);
+            GroupedDataset<String, ListDataset<FImage>, FImage> data = GroupSampler.sample(trainImages, 15, false);
 
-            GroupedDataset<String, ListDataset<FImage>, FImage> data =  GroupSampler.sample(trainImages, 15, false);
-
-
-            GroupedRandomSplitter<String, FImage> splits = new GroupedRandomSplitter<String, FImage>(data,80,0,20);
+            GroupedRandomSplitter<String, FImage> splits = new GroupedRandomSplitter<String, FImage>(data, 80, 0, 20);
             GroupedDataset<String, ListDataset<FImage>, FImage> subTrainingSet = splits.getTrainingDataset();
             GroupedDataset<String, ListDataset<FImage>, FImage> subTestSet = splits.getTestDataset();
 
@@ -83,10 +87,10 @@ public class Run3Classifier {
 
             HardAssigner<byte[], float[], IntFloatPair> assigner;
 
-            assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(subTrainingSet,SAMPLE), pyramidDenseSIFT); //30
-            FeatureExtractor<DoubleFV, FImage> extractor =new PHOWExtractor(pyramidDenseSIFT, assigner);
+            assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(subTrainingSet, SAMPLE), pyramidDenseSIFT); //30
+            FeatureExtractor<DoubleFV, FImage> extractor = new PHOWExtractor(pyramidDenseSIFT, assigner);
 
-            NaiveBayesAnnotator<FImage,String> naiveBayesAnnotator = new NaiveBayesAnnotator<FImage, String>(extractor, NaiveBayesAnnotator.Mode.MAXIMUM_LIKELIHOOD);
+            NaiveBayesAnnotator<FImage, String> naiveBayesAnnotator = new NaiveBayesAnnotator<FImage, String>(extractor, NaiveBayesAnnotator.Mode.MAXIMUM_LIKELIHOOD);
 
             timer.start();
             naiveBayesAnnotator.train(subTrainingSet);
@@ -94,23 +98,22 @@ public class Run3Classifier {
             long resultantTime = timer.duration();
             System.out.println("Time: " + resultantTime);
 
-//
-            subTestSet.forEach((c,fs) -> {
+
+            subTestSet.forEach((c, fs) -> {
                 FImage img = fs.getRandomInstance();
-                System.out.println("Actual: "+ c +"\nExpected: "+ naiveBayesAnnotator.annotate(img));
+                System.out.println("Actual: " + c + "\nExpected: " + naiveBayesAnnotator.annotate(img));
                 System.out.println();
             });
 
-
-            for(int i = 0; i < 60; i++){
+            for (int i = 0; i < 60; i++) {
                 int num = i;
                 FImage image = testImages.getRandomInstance();
-                DisplayUtilities.displayName(image, ""+num);
+                DisplayUtilities.displayName(image, "" + num);
                 System.out.println(num + ": " + naiveBayesAnnotator.annotate(image));
             }
 
             ClassificationEvaluator<CMResult<String>, String, FImage> eval = new ClassificationEvaluator<CMResult<String>, String, FImage>
-                    (naiveBayesAnnotator,subTestSet,new CMAnalyser<>(CMAnalyser.Strategy.SINGLE));
+                    (naiveBayesAnnotator, subTestSet, new CMAnalyser<>(CMAnalyser.Strategy.SINGLE));
 
             Map<FImage, ClassificationResult<String>> guesses = eval.evaluate();
             CMResult<String> result = eval.analyse(guesses);
@@ -141,6 +144,8 @@ public class Run3Classifier {
             e.printStackTrace();
         }
     }
+
+
 
     static HardAssigner<byte[], float[], IntFloatPair> trainQuantiser(GroupedDataset<String, ListDataset<FImage>, FImage> sample, PyramidDenseSIFT<FImage> pyramidDenseSIFT) {
         List<LocalFeatureList<ByteDSIFTKeypoint>> allkeys = new
@@ -174,5 +179,6 @@ public class Run3Classifier {
                     bovw, 2, 2);
             return spatial.aggregate(pdsift.getByteKeypoints(ENERGYTHRESH2), fImage.getBounds()).normaliseFV();//0.015f
         }
+
     }
 }
