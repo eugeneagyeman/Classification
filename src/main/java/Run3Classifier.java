@@ -31,6 +31,7 @@ import org.openimaj.ml.annotation.svm.SVMAnnotator;
 import org.openimaj.ml.clustering.ByteCentroidsResult;
 import org.openimaj.ml.clustering.assignment.HardAssigner;
 import org.openimaj.ml.clustering.kmeans.ByteKMeans;
+import org.openimaj.ml.kernel.HomogeneousKernelMap;
 import org.openimaj.time.Timer;
 import org.openimaj.util.pair.IntFloatPair;
 import java.io.File;
@@ -38,106 +39,119 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class Run3Classifier {
 
     //TODO: Edit this to remove or possibly implement
     private static final String CACHE_PATH = "src/main/java/cache";
     private static final Timer timer = new Timer();
+    final static int CLUSTERS = 300;
+    final static int STEPS = 5;
+    final static int BIN = 7;
+    final static float MAGFACTOR = 6f;
+    final static int SIZES = 7;
+    final static float ENERGYTHRESH1 = 0.005f;
+    final static float ENERGYTHRESH2 = 0.015f;
+    final static int FEATURES = 10000;
+    final static int SAMPLE = 30;
+
 
     //TODO:
     static  {
+
+
         System.out.println("Running Classifier...");
         try {
 
             VFSGroupDataset<FImage> trainImages =
-                    new VFSGroupDataset<>("/Users/eugeneagyeman/Documents/CSP3/Computer Vision/CW3/classification/training", ImageUtilities.FIMAGE_READER);
-
-            VFSGroupDataset<FImage> testImages = new VFSGroupDataset<FImage>("/Users/eugeneagyeman/Documents/CSP3/Computer Vision/CW3/classification/testing",ImageUtilities.FIMAGE_READER);
-            //Debug to show images
-            /*for(final Map.Entry<String,VFSListDataset<FImage>> entry: trainImages.entrySet()) {
-                DisplayUtilities.display(entry.getKey(),entry.getValue());
-            }*/
+                    new VFSGroupDataset<>("/Users/deniz/Desktop/Uni/Third Year/Semester 1/COMP3204 Computer Vision/Coursework3/datasets/training", ImageUtilities.FIMAGE_READER);
 
 
-            GroupedDataset<String, ListDataset<FImage>, FImage> data =
-                    GroupSampler.sample(trainImages, 15, false);
+            VFSListDataset<FImage> testImages = new VFSListDataset<FImage>("/Users/deniz/Desktop/Uni/Third Year/Semester 1/COMP3204 Computer Vision/Coursework3/datasets/testing/",ImageUtilities.FIMAGE_READER);
 
-            GroupedRandomSplitter<String, FImage> splits =
-                    new GroupedRandomSplitter<String, FImage>(data, 50, 0, 50);
+            GroupedDataset<String, ListDataset<FImage>, FImage> data =  GroupSampler.sample(trainImages, 15, false);
+
+
+            GroupedRandomSplitter<String, FImage> splits = new GroupedRandomSplitter<String, FImage>(data,80,0,20);
+            GroupedDataset<String, ListDataset<FImage>, FImage> subTrainingSet = splits.getTrainingDataset();
+            GroupedDataset<String, ListDataset<FImage>, FImage> subTestSet = splits.getTestDataset();
 
             //SIFTs
-            DenseSIFT denseSIFT = new DenseSIFT(5, 7);
-            PyramidDenseSIFT<FImage> pyramidDenseSIFT = new PyramidDenseSIFT<>(denseSIFT, 6f, 7);
+            DenseSIFT denseSIFT = new DenseSIFT(STEPS, BIN); //5 7
+            PyramidDenseSIFT<FImage> pyramidDenseSIFT = new PyramidDenseSIFT<>(denseSIFT, MAGFACTOR, SIZES);
 
+            HardAssigner<byte[], float[], IntFloatPair> assigner;
 
-            //Assigner
-            HardAssigner<byte[], float[], IntFloatPair> assigner = null;
-            File cacheFile;
-            try {
-                cacheFile = new File(CACHE_PATH);
-                assigner = IOUtils.readFromFile(cacheFile);
-                System.out.println("Cache Loaded...");
-            } catch (NullPointerException noFile) {
-                System.out.println("Cache Not Found, creating new one...");
-                assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(trainImages, 30), pyramidDenseSIFT);
-                cacheFile = new File(CACHE_PATH);
-                cacheFile.createNewFile();
-                IOUtils.writeToFile(assigner, cacheFile);
-            } catch (IOException noFile) {
-                System.out.println("Error in accessing cache... creating new cache");
-                assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(trainImages, 30), pyramidDenseSIFT);
-                cacheFile = new File(CACHE_PATH);
-                cacheFile.createNewFile();
-                IOUtils.writeToFile(assigner, cacheFile);
-            }
-            FeatureExtractor<DoubleFV, FImage> extractor = new PHOWExtractor(pyramidDenseSIFT, assigner);
-
-            //Exercise 2: Feature Caching
-            //DiskCachingFeatureExtractor<DoubleFV, FImage> diskCachingFeatureExtractor = new DiskCachingFeatureExtractor<>(cacheFile, homogeneousFeatureExtractor);
-
-            /*LiblinearAnnotator<Caltech101.Record<FImage>, String> ann = new LiblinearAnnotator<>(
-                    diskCachingFeatureExtractor,
-                    LiblinearAnnotator.Mode.MULTICLASS,
-                    SolverType.L2R_L2LOSS_SVC,
-                    1.0,
-                    0.00001);*/
+            assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(subTrainingSet,SAMPLE), pyramidDenseSIFT); //30
+            FeatureExtractor<DoubleFV, FImage> extractor =new PHOWExtractor(pyramidDenseSIFT, assigner);
 
             NaiveBayesAnnotator<FImage,String> naiveBayesAnnotator = new NaiveBayesAnnotator<FImage, String>(extractor, NaiveBayesAnnotator.Mode.MAXIMUM_LIKELIHOOD);
 
             timer.start();
-            naiveBayesAnnotator.train(trainImages);
+            naiveBayesAnnotator.train(subTrainingSet);
             timer.stop();
             long resultantTime = timer.duration();
             System.out.println("Time: " + resultantTime);
 
-            trainImages.forEach((c,fs) -> {
+//
+            subTestSet.forEach((c,fs) -> {
                 FImage img = fs.getRandomInstance();
                 System.out.println("Actual: "+ c +"\nExpected: "+ naiveBayesAnnotator.annotate(img));
                 System.out.println();
             });
 
-            ClassificationEvaluator<CMResult<String>, String, FImage> eval = new ClassificationEvaluator<>(naiveBayesAnnotator,testImages,new CMAnalyser<>(CMAnalyser.Strategy.SINGLE));
+
+            for(int i = 0; i < 60; i++){
+                int num = i;
+                FImage image = testImages.getRandomInstance();
+                DisplayUtilities.displayName(image, ""+num);
+                System.out.println(num + ": " + naiveBayesAnnotator.annotate(image));
+            }
+
+            ClassificationEvaluator<CMResult<String>, String, FImage> eval = new ClassificationEvaluator<CMResult<String>, String, FImage>
+                    (naiveBayesAnnotator,subTestSet,new CMAnalyser<>(CMAnalyser.Strategy.SINGLE));
 
             Map<FImage, ClassificationResult<String>> guesses = eval.evaluate();
             CMResult<String> result = eval.analyse(guesses);
             System.out.println(result.getDetailReport());
             System.out.println("Classification Completed.");
+            System.out.println("CLUSTERS: " + CLUSTERS);
+            System.out.println("STEPS: " + STEPS);
+            System.out.println("BIN: " + BIN);
+            System.out.println("MAGFACTOR: " + MAGFACTOR);
+            System.out.println("SIZES: " + SIZES);
+            System.out.println("ENERGYTHRESH1: " + ENERGYTHRESH1);
+            System.out.println("ENERGYTHRESH2: " + ENERGYTHRESH2);
+            System.out.println("FEATURES: " + FEATURES);
+            System.out.println("SAMPLE: " + SAMPLE);
+//            System.out.println(eval.getExpected());
+//            Map<FImage, Set<String>> expected = eval.getExpected();
+//            System.out.println(expected.size());
+//            final static int CLUSTERS = 300;
+//            final static int STEPS = 4;
+//            final static int BIN = 8;
+//            final static float MAGFACTOR = 6f;
+//            final static int SIZES = 7;
+//            final static float ENERGYTHRESH = 0.015f;
+//            final static int FEATURES = 10000;
+//            final static int SAMPLE = 30;
+
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    static HardAssigner<byte[], float[], IntFloatPair> trainQuantiser(Dataset<FImage> sample, PyramidDenseSIFT<FImage> pyramidDenseSIFT) {
+    static HardAssigner<byte[], float[], IntFloatPair> trainQuantiser(GroupedDataset<String, ListDataset<FImage>, FImage> sample, PyramidDenseSIFT<FImage> pyramidDenseSIFT) {
         List<LocalFeatureList<ByteDSIFTKeypoint>> allkeys = new
-                ArrayList<>();
+                ArrayList<LocalFeatureList<ByteDSIFTKeypoint>>();
         for (FImage img : sample) {
             pyramidDenseSIFT.analyseImage(img);
-            allkeys.add(pyramidDenseSIFT.getByteKeypoints(0.005f));
+            allkeys.add(pyramidDenseSIFT.getByteKeypoints(ENERGYTHRESH1));//0.005f
         }
-        if (allkeys.size() > 10000)
-            allkeys = allkeys.subList(0, 10000);
-        ByteKMeans km = ByteKMeans.createKDTreeEnsemble(300);
+        if (allkeys.size() > FEATURES)//10000
+            allkeys = allkeys.subList(0, FEATURES);//10000
+        ByteKMeans km = ByteKMeans.createKDTreeEnsemble(CLUSTERS);//300
         DataSource<byte[]> datasource = new LocalFeatureListDataSource<ByteDSIFTKeypoint, byte[]>(allkeys);
         ByteCentroidsResult result = km.cluster(datasource);
         return result.defaultHardAssigner();
@@ -158,7 +172,7 @@ public class Run3Classifier {
             BagOfVisualWords<byte[]> bovw = new BagOfVisualWords<>(assigner);
             BlockSpatialAggregator<byte[], SparseIntFV> spatial = new BlockSpatialAggregator<>(
                     bovw, 2, 2);
-            return spatial.aggregate(pdsift.getByteKeypoints(0.015f), fImage.getBounds()).normaliseFV();
+            return spatial.aggregate(pdsift.getByteKeypoints(ENERGYTHRESH2), fImage.getBounds()).normaliseFV();//0.015f
         }
     }
 }
