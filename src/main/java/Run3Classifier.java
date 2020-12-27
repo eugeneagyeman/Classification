@@ -145,8 +145,6 @@ public class Run3Classifier {
         }
     }
 
-
-
     static HardAssigner<byte[], float[], IntFloatPair> trainQuantiser(GroupedDataset<String, ListDataset<FImage>, FImage> sample, PyramidDenseSIFT<FImage> pyramidDenseSIFT) {
         List<LocalFeatureList<ByteDSIFTKeypoint>> allkeys = new
                 ArrayList<LocalFeatureList<ByteDSIFTKeypoint>>();
