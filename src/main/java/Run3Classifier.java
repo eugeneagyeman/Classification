@@ -109,12 +109,12 @@ public class Run3Classifier {
             long resultantTime = timer.duration();
             System.out.println("Time for Naive Bayes: " + resultantTime / 1000 / 60 + " minutes");
 
-            //SVM
-            timer.start();
-            linearSVMAnnotator.train(subTrainingSet);
-            timer.stop();
-            long resultantTime2 = timer.duration();
-            System.out.println("Time for Linear SVM: " + resultantTime2 / 1000 / 60 + " minutes");
+//            //SVM
+//            timer.start();
+//            linearSVMAnnotator.train(subTrainingSet);
+//            timer.stop();
+//            long resultantTime2 = timer.duration();
+//            System.out.println("Time for Linear SVM: " + resultantTime2 / 1000 / 60 + " minutes");
 
             //LibLinear
             timer.start();
