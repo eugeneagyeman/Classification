@@ -161,7 +161,7 @@ public class Run3Classifier {
 
         System.out.println("Lib Linear Annotator:");
         System.out.println(result.getDetailReport());
-        System.out.println("Time for Naive Bayes Report: " + convertToMinutes(duration) + " minutes");
+        System.out.println("Time for Lib Linear Report: " + convertToMinutes(duration) + " minutes");
         System.out.println("--------------------------");
         return result;
     }
