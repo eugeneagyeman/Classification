@@ -48,24 +48,23 @@ import java.util.stream.IntStream;
 public class Run3Classifier {
 
     final static int CLUSTERS = 300; //300
-    final static int STEPS = 4; //5
-    final static int BIN = 8; //7
+    final static int STEPS = 5; //5
+    final static int BIN = 7; //7
     final static float MAGFACTOR = 6f; //6f
     final static int SIZES = 7; //7
     final static float ENERGYTHRESH1 = 0.005f; //0.005f
     final static float ENERGYTHRESH2 = 0.015f;  //0.015f
     final static int FEATURES = 10000; //10000
     final static int SAMPLE = 30; //30
-    final static int TRAININGSIZE = 50;
-    final static int TESTINGSIZE = 50;
+    final static int TRAININGSIZE = 80;
+    final static int TESTINGSIZE = 20;
     final static int VALIDATIONSIZE = 0;
     final static int BLOCKX = 2;//2
     final static int BLOCKY = 2;//2
     final static HashMap<String, String> annotations = new HashMap<>();
     final static HashMap<String, String> NBannotations = new HashMap<>();
-
-    //TODO: Edit this to remove or possibly implement
-    private static final String CACHE_PATH = "src/main/java/cache";
+    static final double HYPERPARMETER_C = 1.0;
+    static final double EPOCHS = 0.01;
     private static final Timer timer = new Timer();
 
     static {
@@ -83,25 +82,24 @@ public class Run3Classifier {
             GroupedDataset<String, ListDataset<FImage>, FImage> subTrainingSet = splits.getTrainingDataset();
             GroupedDataset<String, ListDataset<FImage>, FImage> subTestSet = splits.getTestDataset();
 
-            //SIFTs
+            //SIFTS
             DenseSIFT denseSIFT = new DenseSIFT(STEPS, BIN); //5 7
-            PyramidDenseSIFT<FImage> pyramidDenseSIFT = new PyramidDenseSIFT<>(denseSIFT, MAGFACTOR, SIZES);
 
             HardAssigner<byte[], float[], IntFloatPair> assigner; //30
-            assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(subTrainingSet, SAMPLE), pyramidDenseSIFT);
+            assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(subTrainingSet, SAMPLE), denseSIFT);
 
             HomogeneousKernelMap hkm = new HomogeneousKernelMap(HomogeneousKernelMap.KernelType.Chi2, HomogeneousKernelMap.WindowType.Rectangular);
-            FeatureExtractor<DoubleFV, FImage> wrappedExtractor = hkm.createWrappedExtractor(new PHOWExtractor(pyramidDenseSIFT, assigner));
+            FeatureExtractor<DoubleFV, FImage> wrappedExtractor = hkm.createWrappedExtractor(new PHOWExtractor(denseSIFT, assigner));
 
-            NaiveBayesAnnotator<FImage, String> naiveBayesAnnotator = new NaiveBayesAnnotator<>(wrappedExtractor, NaiveBayesAnnotator.Mode.MAXIMUM_LIKELIHOOD);
-            LiblinearAnnotator<FImage, String> liblinearAnnotator = new LiblinearAnnotator<>(wrappedExtractor, LiblinearAnnotator.Mode.MULTICLASS, SolverType.L2R_L2LOSS_SVC, 1.0, 0.00001);
+            //NaiveBayesAnnotator<FImage, String> naiveBayesAnnotator = new NaiveBayesAnnotator<>(wrappedExtractor, NaiveBayesAnnotator.Mode.MAXIMUM_LIKELIHOOD);
+            LiblinearAnnotator<FImage, String> liblinearAnnotator = new LiblinearAnnotator<>(wrappedExtractor, LiblinearAnnotator.Mode.MULTICLASS, SolverType.L2R_L2LOSS_SVC_DUAL, HYPERPARMETER_C, EPOCHS);
 
-            //Training Classifier using Naives Bayes
+            /*//Training Classifier using Naives Bayes
             timer.start();
             naiveBayesAnnotator.train(subTrainingSet);
             timer.stop();
             long resultantTime = timer.duration();
-            System.out.println("Time for Naive Bayes Training: " + convertToMinutes(resultantTime) + " minutes");
+            System.out.println("Time for Naive Bayes Training: " + convertToMinutes(resultantTime) + " minutes");*/
 
             //Training Classifier using Lib Linear
             timer.start();
@@ -111,12 +109,14 @@ public class Run3Classifier {
             System.out.println("Time for LibLinear Training: " + convertToMinutes(resultantTime3) + " minutes");
 
 
+            /*
             //Annotating Images using Naive Bayes Classifier
             timer.start();
             annotateImagesNB(testImages, naiveBayesAnnotator);
             timer.stop();
             long resultantTime4 = timer.duration();
             getNaivesBayesEvaluationResult(subTestSet, naiveBayesAnnotator, resultantTime4);
+            */
 
 
             //Annotating Images using the LibLinear Classifier
@@ -205,12 +205,12 @@ public class Run3Classifier {
         return name.substring(8);
     }
 
-    static HardAssigner<byte[], float[], IntFloatPair> trainQuantiser(GroupedDataset<String, ListDataset<FImage>, FImage> sample, PyramidDenseSIFT<FImage> pyramidDenseSIFT) {
+    static HardAssigner<byte[], float[], IntFloatPair> trainQuantiser(GroupedDataset<String, ListDataset<FImage>, FImage> sample, DenseSIFT denseSIFT) {
         List<LocalFeatureList<ByteDSIFTKeypoint>> allkeys = new
                 ArrayList<>();
         for (FImage img : sample) {
-            pyramidDenseSIFT.analyseImage(img);
-            allkeys.add(pyramidDenseSIFT.getByteKeypoints());//0.005f
+            denseSIFT.analyseImage(img);
+            allkeys.add(denseSIFT.getByteKeypoints());//0.005f
         }
         if (allkeys.size() > FEATURES)//10000
             allkeys = allkeys.subList(0, FEATURES);//10000
@@ -221,10 +221,10 @@ public class Run3Classifier {
     }
 
     static class PHOWExtractor implements FeatureExtractor<DoubleFV, FImage> {
-        PyramidDenseSIFT<FImage> pdsift;
+        DenseSIFT pdsift;
         HardAssigner<byte[], float[], IntFloatPair> assigner;
 
-        public PHOWExtractor(PyramidDenseSIFT<FImage> pdsift, HardAssigner<byte[], float[], IntFloatPair>
+        public PHOWExtractor(DenseSIFT pdsift, HardAssigner<byte[], float[], IntFloatPair>
                 assigner) {
             this.pdsift = pdsift;
             this.assigner = assigner;
