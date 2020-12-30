@@ -1,4 +1,4 @@
-package Run2;
+package uk.ac.soton.ecs.run2;
 
 import de.bwaldvogel.liblinear.SolverType;
 import org.apache.commons.vfs2.FileObject;
@@ -10,58 +10,32 @@ import org.openimaj.feature.DoubleFV;
 import org.openimaj.feature.FeatureExtractor;
 import org.openimaj.feature.FloatFV;
 import org.openimaj.feature.SparseIntFV;
-import org.openimaj.experiment.dataset.split.GroupedRandomSplitter;
-import org.openimaj.experiment.evaluation.classification.ClassificationEvaluator;
-import org.openimaj.experiment.evaluation.classification.ClassificationResult;
-import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMAnalyser;
-import org.openimaj.experiment.evaluation.classification.analysers.confusionmatrix.CMResult;
-import org.openimaj.feature.*;
-import org.openimaj.image.DisplayUtilities;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.feature.local.aggregate.BagOfVisualWords;
 import org.openimaj.image.feature.local.aggregate.BlockSpatialAggregator;
 import org.openimaj.image.feature.local.keypoints.FloatKeypoint;
 import org.openimaj.ml.annotation.Annotator;
-import org.openimaj.io.IOUtils;
 import org.openimaj.ml.annotation.ScoredAnnotation;
 import org.openimaj.ml.annotation.linear.LiblinearAnnotator;
 import org.openimaj.ml.clustering.FloatCentroidsResult;
 import org.openimaj.ml.clustering.assignment.HardAssigner;
 import org.openimaj.ml.clustering.kmeans.FloatKMeans;
 import org.openimaj.util.pair.IntFloatPair;
+import uk.ac.soton.ecs.main.Writer;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.*;
+import java.util.TreeMap;
 
 public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
-
-    /*
-    private static int MAX_DP_SIZ; //10000 for testing
-    private static int SAMPLE_SIZE; //100 for testing, recommended 8
-    private static int SAMPLE_GAP; //30 for testing, recommended 4
-    private static int CODEBOOK_SIZE; //500 recommended
-    */
-
 
     final static int MAX_DP_SIZ = 10000; //probs like 5000-10000 or something
     final static int SAMPLE_SIZE = 8; //100 for testing, recommended 8
     final static int SAMPLE_GAP = 4; //30 for testing, recommended 4
     final static int CODEBOOK_SIZE = 500;
-
-
-    /*
-    public BoVWExtractor(int maxFeatureCap, int sampleSize, int sampleGap,int codebookSize){
-        this.MAX_DP_SIZ = maxFeatureCap;
-        this.SAMPLE_SIZE = sampleSize;
-        this.SAMPLE_GAP = sampleGap;
-        this.CODEBOOK_SIZE = codebookSize;
-    }*/
-
 
     public BoVWExtractor(HardAssigner<float[], float[], IntFloatPair> hardAssigner) {
         assigner = hardAssigner;
@@ -134,10 +108,6 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
         return r.defaultHardAssigner();
     }
 
-    // yeah probably
-    // you could just checkout my branch
-    // one sec
-
     public static List<float[]> getFVs(FImage f) {
         List<float[]> dps = new ArrayList<>();
         float[][] pxls = f.pixels;
@@ -171,6 +141,28 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
             }
         }
         return keypoints;
+    }
+
+    public static HardAssigner<float[], float[], IntFloatPair> trainHardAssigner(VFSGroupDataset<FImage> imgs) {
+        List<float[]> dps = new ArrayList<>();
+        List<float[]> datapoints;
+
+        imgs.forEach(( c, fs) -> {
+            fs.forEach( f -> {
+                dps.addAll(getFVs(f));
+            });
+        });
+
+        if (dps.size() > MAX_DP_SIZ)
+            datapoints = dps.subList(0, MAX_DP_SIZ);
+        else
+            datapoints = dps;
+
+        float[][] fvs = datapoints.toArray(new float[datapoints.size()][64]);
+        FloatKMeans km = FloatKMeans.createKDTreeEnsemble(500);
+        FloatCentroidsResult r = km.cluster(fvs);
+
+        return r.defaultHardAssigner();
     }
 
     public static void trainAndTest() throws FileSystemException {
