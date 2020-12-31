@@ -111,7 +111,7 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
     public static List<float[]> getFVs(FImage f) {
         List<float[]> dps = new ArrayList<>();
         float[][] pxls = f.pixels;
-        for (int x = 0; x < pxls.length; x+=SAMPLE_GAP) {
+        for (int x = 0; x < pxls[0].length; x+=SAMPLE_GAP) {
             for (int y = 0; y < pxls.length; y+=SAMPLE_GAP) {
                 dps.add(getPatch(f, x, y));
             }
@@ -133,11 +133,9 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
     private static List<FloatKeypoint> getFloatKeypoints(FImage f) {
         float[][] pxls = f.pixels;
         List<FloatKeypoint> keypoints = new ArrayList<>();
-        for (int x = 0; x < pxls.length; x+=SAMPLE_GAP) {
+        for (int x = 0; x < pxls[0].length; x+=SAMPLE_GAP) {
             for (int y = 0; y < pxls.length; y+=SAMPLE_GAP) {
-                float[] fv = getPatch(f, x, y);
-                FloatKeypoint keyPoint = getKeyPoint(x, y, 0, 1, getPatch(f, x, y));
-                keypoints.add(keyPoint);
+                keypoints.add(getKeyPoint(x, y, 0, 1, getPatch(f, x, y)));
             }
         }
         return keypoints;
@@ -168,15 +166,27 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
     public static void trainAndTest() throws FileSystemException {
         File workingDir = new File("../classification");
         VFSGroupDataset<FImage> trainingData = new VFSGroupDataset<>("zip:" + workingDir.getAbsolutePath() + "/training.zip", ImageUtilities.FIMAGE_READER);
+        System.out.println("Data retrieved.");
 
+        System.out.print("Training assigner... ");
         BoVWExtractor bovwe = new BoVWExtractor(trainHardAssigner(trainingData));
+        System.out.println("Trained.");
 
+        System.out.print("Training annotator... ");
         Annotator<FImage, String> annotator = trainLibLinearAnnotator(trainingData, bovwe);
+        System.out.println("Trained. Generated annotations:");
+        System.out.println(annotator.getAnnotations());
 
+        System.out.print("Annotating test set...");
         VFSGroupDataset<FImage> testData = new VFSGroupDataset<>("zip:" + workingDir.getAbsolutePath() + "/testing.zip", ImageUtilities.FIMAGE_READER);
         Map<String, String> results = getTestDataClassifications(testData, annotator);
+        System.out.println("Annotated");
 
+        System.out.print("Writing results to file...");
         writeResultsToFile(results);
+        System.out.println("Written.");
+
+        System.out.println("Finished.");
     }
 
     private static LiblinearAnnotator<FImage, String> trainLibLinearAnnotator(VFSGroupDataset<FImage> trainingData, BoVWExtractor bovwe) {
@@ -200,9 +210,10 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
         testData.forEach( (c, fs) -> {
             for (int i = 0; i < fs.size(); i++) {
                 FImage f = fs.get(i);
-                FileObject fo = fs.getFileObject(0);
+                FileObject fo = fs.getFileObject(i);
                 List<ScoredAnnotation<String>> annotations = annotator.annotate(f);
                 results.put(fo.getName().getBaseName(), annotations.get(0).annotation);
+                System.out.println(fo.getName().getBaseName() + " " + annotations.get(0).annotation);
             }
         });
         return results;
@@ -229,13 +240,30 @@ public class BoVWExtractor implements FeatureExtractor<DoubleFV, FImage> {
 
     HardAssigner<float[], float[], IntFloatPair> assigner;
 
+    private DoubleFV meanCentredFV(DoubleFV fv) {
+        double[] fvRArr = new double[fv.length()];
+        double[] fvArr = fv.values;
+
+        double avg = 0;
+        for (int i = 0; i < fvArr.length; i++) {
+            avg+=fvArr[i];
+        }
+        avg /= fv.length();
+
+        for (int i = 0; i < fvArr.length; i++) {
+            fvRArr[i] = fvArr[i]-avg;
+        }
+
+        return new DoubleFV(fvRArr);
+    }
+
     @Override
     public DoubleFV extractFeature(FImage img) {
         BagOfVisualWords<float[]> bovw = new BagOfVisualWords<>(assigner);
 
-        List<FloatKeypoint> things = getFloatKeypoints(img);
+        List<FloatKeypoint> keypoints = getFloatKeypoints(img);
         BlockSpatialAggregator<float[], SparseIntFV> spatial = new BlockSpatialAggregator<>(bovw, 4,4);
-        return spatial.aggregate(things, img.getContentArea()).normaliseFV();
-//        return bovw.aggregate(things).normaliseFV();
+        return meanCentredFV(spatial.aggregate(keypoints, img.getContentArea()).normaliseFV());
+//        return bovw.aggregate(keypoints).normaliseFV();
     }
 }
