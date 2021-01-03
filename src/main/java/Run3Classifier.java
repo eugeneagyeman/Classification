@@ -101,7 +101,7 @@ public class Run3Classifier {
             long resultantTime2 = timer.duration();
             getEvaluation(subTestSet, liblinearAnnotator, resultantTime2);
 
-            Writer fileWriter = new Writer("3/" + accuracy);
+            Writer fileWriter = new Writer("3_" + accuracy);
             fileWriter.writeResults(annotations);
 
             printParameters();
