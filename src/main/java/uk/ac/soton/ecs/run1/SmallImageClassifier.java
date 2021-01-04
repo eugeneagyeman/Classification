@@ -39,7 +39,7 @@ public class SmallImageClassifier {
                 ffv.concatenate(new FloatFV(pixel));
         }
         featureVector = new DoubleFV(ffv.asDoubleVector());
-        return featureVector;
+        return featureVector.normaliseFV();
     }
 
     private static FImage cropImage(FImage img) {
@@ -104,8 +104,8 @@ public class SmallImageClassifier {
         List<double[]> featureSpace = getTrainingVectors(classesPairs, workingDir);
 
         double[][] fixedFeatureSpace = featureSpace.toArray(new double[featureSpace.size()][CROP_SIZE_PX*CROP_SIZE_PX]);
-        final int K = (int) Math.sqrt(featureSpace.size());
-        DoubleKNNAssigner nn = new DoubleKNNAssigner(fixedFeatureSpace, DoubleFVComparison.EUCLIDEAN, K);
+
+        DoubleKNNAssigner nn = new DoubleKNNAssigner(fixedFeatureSpace, false, 1);
 
         Map<String, String> results = classifyTestData(nn, fixedFeatureSpace, classesPairs, workingDir);
         writeResults(results);
@@ -137,7 +137,6 @@ public class SmallImageClassifier {
                 double[] fv = centredNormalisedFV(f);
                 int[] r = assigner.assign(fv);
                 String classifier = findMajority(r, fixedFeatureSpace, classesPairs);
-                classesPairs.put(fv, classifier);
                 results.put(fo.getName().getBaseName(), classifier);
 //                w.writeResult(fo, classifier);
 //                w.flush();
