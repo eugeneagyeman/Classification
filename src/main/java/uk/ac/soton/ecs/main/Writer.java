@@ -2,7 +2,6 @@ package uk.ac.soton.ecs.main;
 
 import org.apache.commons.vfs2.FileObject;
 
-import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Map;
@@ -31,7 +30,7 @@ public class Writer {
     }
 
     /**
-     * Initialise a Writer on a specific file path. Only reccomended to use for debugging.
+     * Initialise a App.Writer on a specific file path. Only reccomended to use for debugging.
      * @param fn
      */
     public Writer(String fn) {

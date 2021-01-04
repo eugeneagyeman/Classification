@@ -17,3 +17,7 @@ target/
 # Default ignored files
 /.idea/workspace.xml
 Cache
+*.class
+*.DS_Store
+/target/
+/.idea/
