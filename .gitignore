@@ -2,3 +2,6 @@
 *.DS_Store
 /target/
 /.idea/
+.*
+SceneClassification.iml
+src/main/resources/
