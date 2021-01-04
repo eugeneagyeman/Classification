@@ -45,7 +45,7 @@ public class Run3Classifier {
     private final static int CLUSTERS = 300; //300
     private final static int STEPS = 5; //5
     private final static int BIN = 7; //7
-    private final static float MAGFACTOR = 6f; //6f
+    private final static float MAGFACTOR = 7f; //6f
     private final static int SIZES = 8; //7
     private final static float ENERGYTHRESH1 = 0.005f;  //0.005f
     private final static float ENERGYTHRESH2 = 0.015f;  //0.015f
