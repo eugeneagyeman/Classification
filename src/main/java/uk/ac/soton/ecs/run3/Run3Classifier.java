@@ -83,7 +83,7 @@ public class Run3Classifier {
             PyramidDenseSIFT<FImage> pyramidDenseSIFT = new PyramidDenseSIFT<>(denseSIFT, MAGFACTOR, 2, 4, 6, 8, 10);
 
             HardAssigner<byte[], float[], IntFloatPair> assigner; //30
-            assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(subTrainingSet, SAMPLE), denseSIFT);
+            assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(data, SAMPLE), denseSIFT);
             HomogeneousKernelMap hkm = new HomogeneousKernelMap(HomogeneousKernelMap.KernelType.Chi2, HomogeneousKernelMap.WindowType.Rectangular);
             FeatureExtractor<DoubleFV, FImage> wrappedExtractor = hkm.createWrappedExtractor(new PHOWExtractor(pyramidDenseSIFT, assigner));
 
@@ -91,7 +91,7 @@ public class Run3Classifier {
 
             //Training Classifier using LibLinear
             timer.start();
-            liblinearAnnotator.train(subTrainingSet);
+            liblinearAnnotator.train(data);
             timer.stop();
             long resultantTime = timer.duration();
             System.out.println("Time for LibLinear Training: " + convertToMinutes(resultantTime) + " minutes");
@@ -103,7 +103,7 @@ public class Run3Classifier {
             long resultantTime2 = timer.duration();
             getEvaluation(subTestSet, liblinearAnnotator, resultantTime2);
 
-            Writer fileWriter = new Writer("3_" + accuracy);
+            Writer fileWriter = new Writer(3);
             fileWriter.writeResults(annotations);
 
             printParameters();
