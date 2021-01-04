@@ -1,3 +1,4 @@
+package uk.ac.soton.ecs.run1;
 import org.apache.commons.vfs2.FileObject;
 import org.apache.commons.vfs2.FileSystemException;
 import org.openimaj.data.dataset.VFSGroupDataset;
@@ -8,6 +9,7 @@ import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import org.openimaj.image.processing.resize.ResizeProcessor;
 import org.openimaj.ml.clustering.assignment.soft.DoubleKNNAssigner;
+import uk.ac.soton.ecs.main.Writer;
 
 import java.io.File;
 import java.util.*;
