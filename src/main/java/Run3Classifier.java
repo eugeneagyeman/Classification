@@ -103,7 +103,7 @@ public class Run3Classifier {
             timer.stop();
             long resultantTime2 = timer.duration();
 
-            Writer fileWriter = new Writer("3_" + accuracy);
+            Writer fileWriter = new Writer(3);
             fileWriter.writeResults(annotations);
 
             printParameters();
