@@ -1,3 +1,5 @@
+package uk.ac.soton.ecs.main;
+
 import org.apache.commons.vfs2.FileObject;
 
 import java.io.FileWriter;

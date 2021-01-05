@@ -152,7 +152,7 @@
                         <manifest>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
-                            <mainClass>Main</mainClass>
+                            <mainClass>uk.ac.soton.ecs.main.Main</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
