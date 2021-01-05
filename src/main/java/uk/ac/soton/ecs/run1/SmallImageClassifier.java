@@ -1,9 +1,9 @@
 package uk.ac.soton.ecs.run1;
+
 import org.apache.commons.vfs2.FileObject;
 import org.apache.commons.vfs2.FileSystemException;
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.feature.DoubleFV;
-import org.openimaj.feature.DoubleFVComparison;
 import org.openimaj.feature.FloatFV;
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;

@@ -37,10 +37,7 @@ import uk.ac.soton.ecs.main.Writer;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class Run3Classifier {
 
@@ -52,7 +49,7 @@ public class Run3Classifier {
     private static final float ENERGYTHRESH1 = 0.005f;  //0.005f
     private static final float ENERGYTHRESH2 = 0.015f;  //0.015f
     private static final int FEATURES = 10000; //10000
-    private static final int SAMPLE = 30; //30
+    private static final int SAMPLE = 5; //30
     private static final int TRAININGSIZE = 80;
     private static final int TESTINGSIZE = 20;
     private static final int VALIDATIONSIZE = 0;
@@ -61,9 +58,8 @@ public class Run3Classifier {
     private static final double HYPERPARMETER_C = 1.0;
     private static final double EPOCHS = 0.00001;
     private static final Timer timer = new Timer();
-    private static final HashMap<String, String> annotations = new HashMap<>();
+    private static Map<String, String> annotations;
     private static double accuracy;
-
 
     private Run3Classifier() {
         throw new IllegalStateException("Must call run method.");
@@ -74,6 +70,7 @@ public class Run3Classifier {
             System.out.println("Running Classifier...");
             VFSGroupDataset<FImage> trainImages =
                     new VFSGroupDataset<>("zip:" + dir + "/training.zip", ImageUtilities.FIMAGE_READER);
+
             trainImages.remove("training");
             VFSListDataset<FImage> testImages = new VFSListDataset<>("zip:" + dir + "/testing.zip", ImageUtilities.FIMAGE_READER);
 
@@ -87,7 +84,7 @@ public class Run3Classifier {
             PyramidDenseSIFT<FImage> pyramidDenseSIFT = new PyramidDenseSIFT<>(denseSIFT, MAGFACTOR, 2, 4, 6, 8);
 
             HardAssigner<byte[], float[], IntFloatPair> assigner; //30
-            assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(data, SAMPLE), pyramidDenseSIFT);
+            assigner = trainQuantiser(data, pyramidDenseSIFT);
             HomogeneousKernelMap hkm = new HomogeneousKernelMap(HomogeneousKernelMap.KernelType.Chi2, HomogeneousKernelMap.WindowType.Rectangular);
             FeatureExtractor<DoubleFV, FImage> wrappedExtractor = hkm.createWrappedExtractor(new PHOWExtractor(pyramidDenseSIFT, assigner));
             LiblinearAnnotator<FImage, String> liblinearAnnotator = new LiblinearAnnotator<>(wrappedExtractor, LiblinearAnnotator.Mode.MULTICLASS, SolverType.L2R_L2LOSS_SVC, HYPERPARMETER_C, EPOCHS);
@@ -104,14 +101,20 @@ public class Run3Classifier {
             annotateImages(testImages, liblinearAnnotator);
             timer.stop();
             long resultantTime2 = timer.duration();
-
-            Writer fileWriter = new Writer(3);
-            fileWriter.writeResults(annotations);
+            Map<String,String> annotationsCopy = Collections.unmodifiableMap(annotations);
+            writeResultsToFile(annotationsCopy);
 
             printParameters();
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private static void writeResultsToFile(Map<String, String> annotations) {
+        Writer fileWriter = new Writer(3);
+        fileWriter.writeResults(annotations);
+        fileWriter.flush();
+        fileWriter.closeFile();
     }
 
     private static long convertToMinutes(long duration) {
@@ -123,13 +126,17 @@ public class Run3Classifier {
     }
 
     private static void annotateImages(VFSListDataset<FImage> testImages, Annotator<FImage, String> liblinearAnnotator) {
-        int bound = testImages.numInstances();
+        int sizeOfTestImages = testImages.size();
+        annotations = new HashMap<>(sizeOfTestImages);
+        int bound = testImages.size();
         for (int i = 0; i < bound; i++) {
             String imageName = getImageNameFromFile(testImages.getID(i));
             FImage img = testImages.getInstance(i);
             String annotation = liblinearAnnotator.annotate(img).get(0).annotation;
             Run3Classifier.annotations.put(imageName, annotation);
         }
+
+        System.out.println(annotations.size());
 
     }
 
