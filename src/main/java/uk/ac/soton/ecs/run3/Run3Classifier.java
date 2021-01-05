@@ -1,3 +1,5 @@
+package uk.ac.soton.ecs.run3;
+
 import de.bwaldvogel.liblinear.SolverType;
 import org.openimaj.data.DataSource;
 import org.openimaj.data.dataset.GroupedDataset;
@@ -31,6 +33,7 @@ import org.openimaj.ml.clustering.kmeans.ByteKMeans;
 import org.openimaj.ml.kernel.HomogeneousKernelMap;
 import org.openimaj.time.Timer;
 import org.openimaj.util.pair.IntFloatPair;
+import uk.ac.soton.ecs.main.Writer;
 
 import java.io.File;
 import java.io.IOException;
@@ -84,10 +87,9 @@ public class Run3Classifier {
             PyramidDenseSIFT<FImage> pyramidDenseSIFT = new PyramidDenseSIFT<>(denseSIFT, MAGFACTOR, 2, 4, 6, 8);
 
             HardAssigner<byte[], float[], IntFloatPair> assigner; //30
-            assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(subTrainingSet, SAMPLE), pyramidDenseSIFT);
+            assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(data, SAMPLE), pyramidDenseSIFT);
             HomogeneousKernelMap hkm = new HomogeneousKernelMap(HomogeneousKernelMap.KernelType.Chi2, HomogeneousKernelMap.WindowType.Rectangular);
             FeatureExtractor<DoubleFV, FImage> wrappedExtractor = hkm.createWrappedExtractor(new PHOWExtractor(pyramidDenseSIFT, assigner));
-
             LiblinearAnnotator<FImage, String> liblinearAnnotator = new LiblinearAnnotator<>(wrappedExtractor, LiblinearAnnotator.Mode.MULTICLASS, SolverType.L2R_L2LOSS_SVC, HYPERPARMETER_C, EPOCHS);
 
             //Training Classifier using LibLinear
