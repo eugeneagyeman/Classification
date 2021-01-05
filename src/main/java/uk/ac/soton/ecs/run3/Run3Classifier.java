@@ -1,4 +1,5 @@
 package uk.ac.soton.ecs.run3;
+
 import de.bwaldvogel.liblinear.SolverType;
 import org.openimaj.data.DataSource;
 import org.openimaj.data.dataset.GroupedDataset;
@@ -40,37 +41,40 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.IntStream;
 
 public class Run3Classifier {
 
-    private final static int CLUSTERS = 300; //300
-    private final static int STEPS = 5; //5
-    private final static int BIN = 7; //7
-    private final static float MAGFACTOR = 6f; //6f
-    private final static int SIZES = 8; //7
-    private final static float ENERGYTHRESH1 = 0.005f;  //0.005f
-    private final static float ENERGYTHRESH2 = 0.015f;  //0.015f
-    private final static int FEATURES = 10000; //10000
-    private final static int SAMPLE = 30; //30
-    private final static int TRAININGSIZE = 80;
-    private final static int TESTINGSIZE = 20;
-    private final static int VALIDATIONSIZE = 0;
-    private final static int BLOCKX = 2;//2
-    private final static int BLOCKY = 2;//2
-    private final static double HYPERPARMETER_C = 1.0;
-    private final static double EPOCHS = 0.00001;
-    private final static Timer timer = new Timer();
-    private final HashMap<String, String> annotations = new HashMap<>();
-    private double accuracy;
+    private static final int CLUSTERS = 300; //300
+    private static final int STEPS = 5; //5
+    private static final int BIN = 7; //7
+    private static final float MAGFACTOR = 7f; //6f
+    private static final int SIZES = 8; //7
+    private static final float ENERGYTHRESH1 = 0.005f;  //0.005f
+    private static final float ENERGYTHRESH2 = 0.015f;  //0.015f
+    private static final int FEATURES = 10000; //10000
+    private static final int SAMPLE = 30; //30
+    private static final int TRAININGSIZE = 80;
+    private static final int TESTINGSIZE = 20;
+    private static final int VALIDATIONSIZE = 0;
+    private static final int BLOCKX = 2;//2
+    private static final int BLOCKY = 2;//2
+    private static final double HYPERPARMETER_C = 1.0;
+    private static final double EPOCHS = 0.00001;
+    private static final Timer timer = new Timer();
+    private static final HashMap<String, String> annotations = new HashMap<>();
+    private static double accuracy;
 
-    public Run3Classifier() {
+
+    private Run3Classifier() {
+        throw new IllegalStateException("Must call run method.");
+    }
+    public static void run() {
         String dir = new File("").getAbsolutePath();
         try {
             System.out.println("Running Classifier...");
             VFSGroupDataset<FImage> trainImages =
                     new VFSGroupDataset<>("zip:" + dir + "/training.zip", ImageUtilities.FIMAGE_READER);
-
+            trainImages.remove("training");
             VFSListDataset<FImage> testImages = new VFSListDataset<>("zip:" + dir + "/testing.zip", ImageUtilities.FIMAGE_READER);
 
             GroupedDataset<String, ListDataset<FImage>, FImage> data = GroupSampler.sample(trainImages, 15, false);
@@ -80,13 +84,12 @@ public class Run3Classifier {
 
             //SIFTS
             DenseSIFT denseSIFT = new DenseSIFT(STEPS, BIN); //5 7
-            PyramidDenseSIFT<FImage> pyramidDenseSIFT = new PyramidDenseSIFT<>(denseSIFT, MAGFACTOR, 2, 4, 6, 8, 10);
+            PyramidDenseSIFT<FImage> pyramidDenseSIFT = new PyramidDenseSIFT<>(denseSIFT, MAGFACTOR, 2, 4, 6, 8);
 
             HardAssigner<byte[], float[], IntFloatPair> assigner; //30
-            assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(data, SAMPLE), denseSIFT);
+            assigner = trainQuantiser(GroupedUniformRandomisedSampler.sample(data, SAMPLE), pyramidDenseSIFT);
             HomogeneousKernelMap hkm = new HomogeneousKernelMap(HomogeneousKernelMap.KernelType.Chi2, HomogeneousKernelMap.WindowType.Rectangular);
             FeatureExtractor<DoubleFV, FImage> wrappedExtractor = hkm.createWrappedExtractor(new PHOWExtractor(pyramidDenseSIFT, assigner));
-
             LiblinearAnnotator<FImage, String> liblinearAnnotator = new LiblinearAnnotator<>(wrappedExtractor, LiblinearAnnotator.Mode.MULTICLASS, SolverType.L2R_L2LOSS_SVC, HYPERPARMETER_C, EPOCHS);
 
             //Training Classifier using LibLinear
@@ -98,10 +101,9 @@ public class Run3Classifier {
 
             //Annotating Images using the LibLinear Classifier
             timer.start();
-            annotateImages(testImages, liblinearAnnotator, annotations);
+            annotateImages(testImages, liblinearAnnotator);
             timer.stop();
             long resultantTime2 = timer.duration();
-            getEvaluation(subTestSet, liblinearAnnotator, resultantTime2);
 
             Writer fileWriter = new Writer(3);
             fileWriter.writeResults(annotations);
@@ -120,22 +122,23 @@ public class Run3Classifier {
         return name.substring(8);
     }
 
-    private void annotateImages(VFSListDataset<FImage> testImages, Annotator<FImage, String> liblinearAnnotator, HashMap<String, String> annotations) {
-        IntStream.range(0, testImages.numInstances()).forEach(i -> {
+    private static void annotateImages(VFSListDataset<FImage> testImages, Annotator<FImage, String> liblinearAnnotator) {
+        int bound = testImages.numInstances();
+        for (int i = 0; i < bound; i++) {
             String imageName = getImageNameFromFile(testImages.getID(i));
             FImage img = testImages.getInstance(i);
             String annotation = liblinearAnnotator.annotate(img).get(0).annotation;
-            annotations.put(imageName, annotation);
-        });
+            Run3Classifier.annotations.put(imageName, annotation);
+        }
 
     }
 
-    HardAssigner<byte[], float[], IntFloatPair> trainQuantiser(GroupedDataset<String, ListDataset<FImage>, FImage> sample, DenseSIFT denseSIFT) {
+    static HardAssigner<byte[], float[], IntFloatPair> trainQuantiser(GroupedDataset<String, ListDataset<FImage>, FImage> sample, PyramidDenseSIFT<FImage> pyramidDenseSIFT) {
         List<LocalFeatureList<ByteDSIFTKeypoint>> allkeys = new
                 ArrayList<>();
         for (FImage img : sample) {
-            denseSIFT.analyseImage(img);
-            allkeys.add(denseSIFT.getByteKeypoints());//0.005f
+            pyramidDenseSIFT.analyseImage(img);
+            allkeys.add(pyramidDenseSIFT.getByteKeypoints());//0.005f
         }
         if (allkeys.size() > FEATURES)//10000
             allkeys = allkeys.subList(0, FEATURES);//10000
@@ -145,7 +148,7 @@ public class Run3Classifier {
         return result.defaultHardAssigner();
     }
 
-    private void printParameters() {
+    private static void printParameters() {
         System.out.println("--------------------------");
         System.out.println("--------------------------");
         System.out.println("Classification complete.");
@@ -165,7 +168,7 @@ public class Run3Classifier {
         System.out.println("BLOCKY: " + BLOCKY);
     }
 
-    private CMResult<String> getEvaluation(GroupedDataset<String, ListDataset<FImage>, FImage> subTestSet, Annotator<FImage, String> annotator, long annotationDuration) throws IOException {
+    private static CMResult<String> getEvaluation(GroupedDataset<String, ListDataset<FImage>, FImage> subTestSet, Annotator<FImage, String> annotator, long annotationDuration) {
         System.out.println("Time for Annotation: " + convertToMinutes(annotationDuration) + " minutes");
         ClassificationEvaluator<CMResult<String>, String, FImage> eval3 = new ClassificationEvaluator<>
                 (annotator, subTestSet, new CMAnalyser<>(CMAnalyser.Strategy.SINGLE));
