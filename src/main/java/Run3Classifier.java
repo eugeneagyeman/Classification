@@ -92,7 +92,7 @@ public class Run3Classifier {
 
             //Training Classifier using LibLinear
             timer.start();
-            liblinearAnnotator.train(subTrainingSet);
+            liblinearAnnotator.train(data);
             timer.stop();
             long resultantTime = timer.duration();
             System.out.println("Time for LibLinear Training: " + convertToMinutes(resultantTime) + " minutes");
@@ -102,7 +102,6 @@ public class Run3Classifier {
             annotateImages(testImages, liblinearAnnotator);
             timer.stop();
             long resultantTime2 = timer.duration();
-            getEvaluation(subTestSet, liblinearAnnotator, resultantTime2);
 
             Writer fileWriter = new Writer("3_" + accuracy);
             fileWriter.writeResults(annotations);
